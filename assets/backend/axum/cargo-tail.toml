@@ -1,0 +1,13 @@
+
+[profile.release]
+overflow-checks = true
+
+[lints.clippy]
+float_arithmetic = "warn"
+cast_sign_loss = "warn"
+cast_precision_loss = "warn"
+print_stdout = "warn"
+print_stderr = "warn"
+dbg_macro = "warn"
+todo = "warn"
+unimplemented = "warn"

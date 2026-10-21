@@ -1,0 +1,14 @@
+target/
+node_modules/
+.venv/
+__pycache__/
+.nuxt/
+.output/
+dist/
+.env
+.env.*
+!.env.example
+.DS_Store
+.idea/
+.vscode/
+certs/*.pem

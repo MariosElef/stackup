@@ -1,0 +1,50 @@
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "plugins": ["typescript", "oxc", "unicorn"],
+  "categories": {
+    "correctness": "error",
+    "suspicious": "error"
+  },
+  "ignorePatterns": [".nuxt", ".output", "dist"],
+  "rules": {
+    "typescript/no-explicit-any": "error"
+  },
+  "overrides": [
+    {
+      "files": ["**/components/**/*.{ts,vue}"],
+      "rules": {
+        "no-restricted-imports": [
+          "error",
+          {
+            "patterns": [
+              {
+                "group": ["**/stores/**", "**/services/**"],
+                "message": "A component takes its data as props and reports through emits; the page owns state and wires services."
+              },
+              {
+                "group": ["**/pages/**", "**/views/**"],
+                "message": "Imports point downward only: a page is the composition root and nothing imports it."
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "files": ["**/services/**/*.ts"],
+      "rules": {
+        "no-restricted-imports": [
+          "error",
+          {
+            "patterns": [
+              {
+                "group": ["**/stores/**", "**/components/**", "**/pages/**", "**/views/**"],
+                "message": "A service talks to the backend and returns data; it never reaches state or UI."
+              }
+            ]
+          }
+        ]
+      }
+    }
+  ]
+}

@@ -1,0 +1,40 @@
+    overrides: [
+      {
+        files: ["**/components/**/*.{ts,vue}"],
+        rules: {
+          "no-restricted-imports": [
+            "error",
+            {
+              patterns: [
+                {
+                  group: ["**/stores/**", "**/services/**", "**/queries/**"],
+                  message:
+                    "A component takes its data as props and reports through emits; the page owns state and wires services.",
+                },
+                {
+                  group: ["**/pages/**", "**/views/**"],
+                  message:
+                    "Imports point downward only: a page is the composition root and nothing imports it.",
+                },
+              ],
+            },
+          ],
+        },
+      },
+      {
+        files: ["**/services/**/*.ts"],
+        rules: {
+          "no-restricted-imports": [
+            "error",
+            {
+              patterns: [
+                {
+                  group: ["**/stores/**", "**/components/**", "**/pages/**", "**/views/**"],
+                  message: "A service talks to the backend and returns data; it never reaches state or UI.",
+                },
+              ],
+            },
+          ],
+        },
+      },
+    ],

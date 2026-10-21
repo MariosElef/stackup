@@ -1,0 +1,8 @@
+# One config, copied verbatim into every repo with TOML. Pins the existing 4-space,
+# short-arrays-inline style instead of taplo's defaults.
+[formatting]
+indent_string = "    "
+column_width = 100
+array_auto_expand = false
+array_auto_collapse = false
+trailing_comma = true

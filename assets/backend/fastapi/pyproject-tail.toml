@@ -1,0 +1,42 @@
+
+[tool.ruff]
+line-length = 100
+extend-exclude = ["*.md"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "N", "UP", "B", "C4", "SIM", "RUF"]
+ignore = ["E501", "B008"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+pythonpath = ["."]
+
+[tool.pyrefly]
+project-includes = ["app"]
+
+# The layering as import contracts: routes -> services -> repositories, SQL only in
+# repositories, nothing below the routes knows HTTP. `lint-imports` (in ci.sh) fails the
+# build on a violation.
+[tool.importlinter]
+root_packages = ["app", "fastapi"]
+include_external_packages = true
+
+[[tool.importlinter.contracts]]
+name = "Imports point downward: routes -> services -> repositories"
+type = "layers"
+layers = ["app.routes", "app.services", "app.repositories"]
+
+[[tool.importlinter.contracts]]
+name = "A route calls a service and never reaches a repository"
+type = "forbidden"
+source_modules = ["app.routes"]
+forbidden_modules = ["app.repositories"]
+allow_indirect_imports = true
+
+[[tool.importlinter.contracts]]
+name = "Below the routes, nothing knows HTTP"
+type = "forbidden"
+source_modules = ["app.services", "app.repositories", "app.models"]
+forbidden_modules = ["fastapi"]
+allow_indirect_imports = true

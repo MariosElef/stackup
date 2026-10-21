@@ -1,0 +1,15 @@
+{
+  "$schema": "./node_modules/oxfmt/configuration_schema.json",
+
+  // One config, copied verbatim into every JS repo, the way .yamlfmt is. These five keys
+  // reproduce what @nuxt/eslint's stylistic rules produced before they were removed, so
+  // adopting the formatter reordered code rather than restyling it.
+  "semi": false,
+  "singleQuote": true,
+  "trailingComma": "none",
+  "arrowParens": "avoid",
+  "quoteProps": "consistent",
+
+  // yamlfmt owns YAML in every repo, with rules this formatter cannot express.
+  "ignorePatterns": ["**/*.yaml", "**/*.yml"]
+}

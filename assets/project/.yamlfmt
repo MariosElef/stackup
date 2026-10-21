@@ -1,0 +1,8 @@
+doublestar: true
+exclude:
+  - "**/node_modules/**"
+formatter:
+  type: basic
+  indentless_arrays: false
+  retain_line_breaks: true
+  scan_folded_as_literal: true
