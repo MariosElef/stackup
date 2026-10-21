@@ -1,0 +1,64 @@
+# One Dockerfile for the whole Rust workspace: `docker compose` builds each service from its own
+# target (`backend`, `frontend`) with this folder as the build context.
+
+FROM rust:slim-trixie AS base
+
+WORKDIR /build
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends pkg-config \
+    && rm -rf /var/lib/apt/lists/*
+
+
+# The Topcoat CLI bundles the assets (stylesheet, browser runtime) the release binary loads from
+# next to itself. Pinned to the revision this project was generated with.
+FROM base AS topcoat-cli
+
+RUN --mount=type=cache,target=/usr/local/cargo/registry \
+    cargo install --git https://github.com/tokio-rs/topcoat --rev {{REV}} topcoat-cli --locked
+
+
+# The cache mounts keep the downloaded crates and the compiled dependencies between builds,
+# for both services at once; the finished files are copied out of the cache before the layer ends.
+FROM base AS backend-build
+
+COPY . .
+RUN --mount=type=cache,target=/usr/local/cargo/registry \
+    --mount=type=cache,target=/build/target \
+    cargo build --release --locked -p {{BACKEND_BIN}} \
+    && install -D target/release/{{BACKEND_BIN}} /out/{{BACKEND_BIN}} \
+    && strip /out/{{BACKEND_BIN}}
+
+FROM gcr.io/distroless/cc-debian13:nonroot AS backend
+
+COPY --from=backend-build /out/{{BACKEND_BIN}} /usr/local/bin/{{BACKEND_BIN}}
+
+USER nonroot:nonroot
+EXPOSE 8000
+
+ENTRYPOINT ["/usr/local/bin/{{BACKEND_BIN}}"]
+
+
+FROM base AS frontend-build
+
+COPY --from=topcoat-cli /usr/local/cargo/bin/topcoat /usr/local/bin/topcoat
+COPY . .
+RUN --mount=type=cache,target=/usr/local/cargo/registry \
+    --mount=type=cache,target=/build/target \
+    topcoat asset bundle --release --bin {{FRONTEND_BIN}} \
+    && install -D target/release/{{FRONTEND_BIN}} /out/{{FRONTEND_BIN}} \
+    && strip /out/{{FRONTEND_BIN}} \
+    && cp -r target/release/assets /out/assets
+
+FROM gcr.io/distroless/cc-debian13:nonroot AS frontend
+
+COPY --from=frontend-build /out/{{FRONTEND_BIN}} /app/{{FRONTEND_BIN}}
+COPY --from=frontend-build /out/assets /app/assets
+
+ENV HOST=0.0.0.0 \
+    PORT=3000
+
+USER nonroot:nonroot
+EXPOSE 3000
+
+ENTRYPOINT ["/app/{{FRONTEND_BIN}}"]

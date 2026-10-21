@@ -3,6 +3,20 @@
 # `mkcert -install` adds mkcert's local CA to your system trust store (it may ask for your password).
 set -eu
 
+# mkcert is fetched when it is missing and a package manager is there to do it.
+if ! command -v mkcert >/dev/null 2>&1; then
+    if command -v brew >/dev/null 2>&1; then
+        echo "Installing mkcert with Homebrew..."
+        brew install mkcert nss
+    elif command -v apt-get >/dev/null 2>&1; then
+        echo "Installing mkcert with apt (it may ask for your password)..."
+        sudo apt-get install -y mkcert libnss3-tools
+    elif command -v scoop >/dev/null 2>&1; then
+        scoop install mkcert
+    elif command -v choco >/dev/null 2>&1; then
+        choco install -y mkcert
+    fi
+fi
 command -v mkcert >/dev/null 2>&1 || {
     echo "mkcert is required (https://github.com/FiloSottile/mkcert#installation):" >&2
     echo "  macOS:   brew install mkcert" >&2

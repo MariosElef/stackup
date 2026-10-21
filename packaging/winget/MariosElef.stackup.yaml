@@ -1,0 +1,7 @@
+# winget version manifest. The three files of a version (this, .installer.yaml and
+# .locale.en-US.yaml) go in microsoft/winget-pkgs under manifests/m/MariosElef/stackup/<version>.
+PackageIdentifier: MariosElef.stackup
+PackageVersion: 0.1.0
+DefaultLocale: en-US
+ManifestType: version
+ManifestVersion: 1.6.0

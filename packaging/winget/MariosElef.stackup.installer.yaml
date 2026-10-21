@@ -1,0 +1,13 @@
+PackageIdentifier: MariosElef.stackup
+PackageVersion: 0.1.0
+InstallerType: zip
+NestedInstallerType: portable
+NestedInstallerFiles:
+  - RelativeFilePath: stackup-v0.1.0-x86_64-pc-windows-msvc\stackup.exe
+    PortableCommandAlias: stackup
+Installers:
+  - Architecture: x64
+    InstallerUrl: https://github.com/MariosElef/stackup/releases/download/v0.1.0/stackup-v0.1.0-x86_64-pc-windows-msvc.zip
+    InstallerSha256: REPLACE_WITH_THE_SHA256_FROM_THE_RELEASE
+ManifestType: installer
+ManifestVersion: 1.6.0

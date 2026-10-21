@@ -1,0 +1,8 @@
+# Scripts and Docker files run on Linux (CI, containers, the server): their line endings stay LF
+# on every system, so a checkout on Windows does not break them.
+* text=auto
+*.sh text eol=lf
+.githooks/* text eol=lf
+Dockerfile text eol=lf
+docker-compose.yml text eol=lf
+Caddyfile text eol=lf

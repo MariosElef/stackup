@@ -1,0 +1,46 @@
+# Arch Linux package, for the AUR. Build it with `makepkg -si`.
+# Before publishing a version, replace SKIP with the tarball's checksum: `updpkgsums`.
+pkgname=stackup
+pkgver=0.1.0
+pkgrel=1
+pkgdesc="Scaffold a full-stack project from the official tools, then run it"
+arch=('x86_64' 'aarch64')
+url="https://github.com/MariosElef/stackup"
+license=('MIT')
+depends=('git' 'gcc-libs')
+makedepends=('cargo')
+optdepends=(
+  'docker: run and deploy the projects it makes'
+  'docker-compose: run and deploy the projects it makes'
+  'github-cli: create the GitHub repository and sign in'
+  'lazygit: the git client opened from the menu'
+  'mkcert: local HTTPS'
+)
+source=("$pkgname-$pkgver.tar.gz::$url/archive/refs/tags/v$pkgver.tar.gz")
+sha256sums=('SKIP')
+
+prepare() {
+  cd "$pkgname-$pkgver"
+  export RUSTUP_TOOLCHAIN=stable
+  cargo fetch --locked --target "$(rustc -vV | sed -n 's/host: //p')"
+}
+
+build() {
+  cd "$pkgname-$pkgver"
+  export RUSTUP_TOOLCHAIN=stable
+  export CARGO_TARGET_DIR=target
+  cargo build --frozen --release
+}
+
+check() {
+  cd "$pkgname-$pkgver"
+  export RUSTUP_TOOLCHAIN=stable
+  cargo test --frozen
+}
+
+package() {
+  cd "$pkgname-$pkgver"
+  install -Dm755 "target/release/$pkgname" "$pkgdir/usr/bin/$pkgname"
+  install -Dm644 LICENSE "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
+  install -Dm644 README.md "$pkgdir/usr/share/doc/$pkgname/README.md"
+}

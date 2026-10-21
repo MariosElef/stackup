@@ -2,9 +2,31 @@
 name = "stackup"
 version = "0.1.0"
 edition = "2024"
+license = "MIT"
+description = "Scaffold a full-stack project from the official tools, then run it"
+repository = "https://github.com/MariosElef/stackup"
+homepage = "https://github.com/MariosElef/stackup"
+readme = "README.md"
+keywords = ["scaffold", "docker", "cli", "tui", "nuxt"]
+categories = ["command-line-utilities", "development-tools"]
+
+# `cargo deb` builds a .deb from this.
+[package.metadata.deb]
+section = "devel"
+priority = "optional"
+depends = "$auto, git, docker.io | docker-ce"
+extended-description = "stackup creates a full-stack project (Nuxt, Vue or Topcoat frontend; axum or FastAPI backend; Postgres, Redis, MongoDB, Keycloak, local HTTPS) from the official tools, writes the Docker Compose file and the IDE run configurations, and then runs it: up, dev, deploy over SSH, environments, and lazygit."
+assets = [
+    ["target/release/stackup", "usr/bin/", "755"],
+    ["README.md", "usr/share/doc/stackup/README", "644"],
+    ["LICENSE", "usr/share/doc/stackup/LICENSE", "644"],
+]
 
 [dependencies]
 anyhow = "1.0.104"
 clap = { version = "4.6.7", features = ["derive"] }
+getrandom = "0.4.3"
+portable-pty = "0.9.0"
 ratatui = "0.30.2"
 serde_json = { version = "1.0.154", features = ["preserve_order"] }
+tui-term = "0.3.4"

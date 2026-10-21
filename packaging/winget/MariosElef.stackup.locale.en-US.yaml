@@ -1,0 +1,16 @@
+PackageIdentifier: MariosElef.stackup
+PackageVersion: 0.1.0
+PackageLocale: en-US
+Publisher: MariosElef
+PackageName: stackup
+PackageUrl: https://github.com/MariosElef/stackup
+License: MIT
+LicenseUrl: https://github.com/MariosElef/stackup/blob/main/LICENSE
+ShortDescription: Scaffold a full-stack project from the official tools, then run it
+Moniker: stackup
+Tags:
+  - scaffold
+  - docker
+  - cli
+ManifestType: defaultLocale
+ManifestVersion: 1.6.0

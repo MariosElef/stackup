@@ -1,0 +1,23 @@
+{
+  "version": "0.1.0",
+  "description": "Scaffold a full-stack project from the official tools, then run it",
+  "homepage": "https://github.com/MariosElef/stackup",
+  "license": "MIT",
+  "architecture": {
+    "64bit": {
+      "url": "https://github.com/MariosElef/stackup/releases/download/v0.1.0/stackup-v0.1.0-x86_64-pc-windows-msvc.zip",
+      "hash": "REPLACE_WITH_THE_SHA256_FROM_THE_RELEASE",
+      "extract_dir": "stackup-v0.1.0-x86_64-pc-windows-msvc"
+    }
+  },
+  "bin": "stackup.exe",
+  "checkver": "github",
+  "autoupdate": {
+    "architecture": {
+      "64bit": {
+        "url": "https://github.com/MariosElef/stackup/releases/download/v$version/stackup-v$version-x86_64-pc-windows-msvc.zip",
+        "extract_dir": "stackup-v$version-x86_64-pc-windows-msvc"
+      }
+    }
+  }
+}
