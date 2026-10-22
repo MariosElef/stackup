@@ -10,6 +10,7 @@ use crate::{
         registry,
     },
     ui::{
+        components::celebration::Celebration,
         features::projects::farewell::Farewell,
         stores::{
             app::{App, Prompt, PromptKind, Then},
@@ -253,9 +254,39 @@ impl App {
         }
     }
 
+    /// The celebration is over, or was skipped: leave the finished run as `q` would.
+    pub fn end_celebration(&mut self) {
+        if self.celebration.take().is_some() {
+            self.back();
+        }
+    }
+
+    /// A run on the install page finished well: say so, then leave it on its own.
+    fn celebrate(&mut self) {
+        let Some(run) = &self.run else { return };
+        let (title, next) = if let Some(name) = &self.creating {
+            (format!("{name} created"), "opening your projects")
+        } else if self.github_run {
+            ("GitHub is set up".to_string(), "back to the wizard")
+        } else {
+            let what = run.title.strip_prefix("install ").unwrap_or(&run.title);
+            (format!("{what} installed"), "back to the wizard")
+        };
+        self.celebration = Some(Celebration::new(&title, next));
+    }
+
     pub fn pump(&mut self) {
         if self.farewell.as_ref().is_some_and(Farewell::done) {
             return self.end_farewell();
+        }
+        if self.celebration.as_ref().is_some_and(Celebration::done) {
+            return self.end_celebration();
+        }
+        let finished_install = self.page == Page::Install
+            && self.celebration.is_none()
+            && self.run.as_ref().is_some_and(|r| r.succeeded);
+        if finished_install {
+            self.celebrate();
         }
         self.tick = self.tick.wrapping_add(1);
         self.poll_usage();

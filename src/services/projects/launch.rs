@@ -54,7 +54,9 @@ struct Part {
     here: String,
     secure: Option<String>,
     /// Whether the proxy answers on the secure address right now.
-    secure_up: bool,
+    proxy_up: bool,
+    /// Whether something answers on the plain address right now.
+    serving: bool,
     /// Whether this start runs it; when not, it is listed with how to start it.
     started: bool,
 }
@@ -96,8 +98,8 @@ fn backend(facts: &Facts, links: &[Link]) -> Option<Part> {
         folder: "backend",
         here: find(links, "api").map_or("http://localhost:8000".into(), |l| l.url.clone()) + page,
         secure: find(links, "api (https)").map(|l| format!("{}{page}", l.url)),
-        secure_up: find(links, "api (https)").is_some_and(answering)
-            && find(links, "api").is_some_and(answering),
+        proxy_up: find(links, "api (https)").is_some_and(answering),
+        serving: find(links, "api").is_some_and(answering),
         started: true,
     })
 }
@@ -123,10 +125,9 @@ fn frontend(facts: &Facts, links: &[Link]) -> Option<Part> {
         folder: "frontend",
         here: find(links, "app").map_or("http://localhost:3000".into(), |l| l.url.clone()),
         secure: find(links, "app (https)").map(|l| l.url.clone()),
-        secure_up: find(links, "app (https)").is_some_and(answering)
-            && (find(links, "app").is_some_and(answering)
-                || (facts.frontend == Frontend::Vue
-                    && urls::listening(super::https_dev::VITE_PORT))),
+        proxy_up: find(links, "app (https)").is_some_and(answering),
+        serving: find(links, "app").is_some_and(answering)
+            || (facts.frontend == Frontend::Vue && urls::listening(super::https_dev::VITE_PORT)),
         started: true,
     })
 }
@@ -172,9 +173,10 @@ fn block(part: &Part) -> Vec<String> {
         format!("{DIM}here   {RESET}{CYAN}{UNDERLINE}{}{RESET}", part.here),
     ];
     if let Some(secure) = &part.secure {
-        // A link only looks like one when something answers: the proxy runs with the stack in
-        // Docker, not with the servers started here.
-        text.push(if part.secure_up {
+        // A link only looks like one when it will answer: the proxy is up, and the server behind
+        // it is either started by this run (the banner comes just before it starts) or running.
+        let live = part.proxy_up && (part.started || part.serving);
+        text.push(if live {
             format!("{DIM}https  {RESET}{CYAN}{UNDERLINE}{secure}{RESET}")
         } else {
             format!(
@@ -298,6 +300,33 @@ mod tests {
             link("app (https)", "https://app.localhost:58443"),
             link("api (https)", "https://api.localhost:58443"),
         ]
+    }
+
+    #[test]
+    fn a_secure_link_is_live_for_a_server_this_run_starts_once_the_proxy_answers() {
+        // The proxy answers; the servers behind it do not yet, as when the banner is printed.
+        let proxy = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        let port = proxy.local_addr().unwrap().port();
+        let closed = {
+            let l = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+            l.local_addr().unwrap().port()
+        };
+        let link = |label: &str, url: String| Link {
+            label: label.into(),
+            url,
+            up: None,
+        };
+        let links = [
+            link("api", format!("http://localhost:{closed}")),
+            link("api (https)", format!("https://api.localhost:{port}")),
+        ];
+        let f = facts(Frontend::None, Backend::Axum);
+        let mut back = backend(&f, &links).unwrap();
+        let text = plain(&block(&back).join("\n"));
+        assert!(!text.contains("not running"), "this run starts it: {text}");
+        back.started = false;
+        let text = plain(&block(&back).join("\n"));
+        assert!(text.contains("not running"), "nothing will answer: {text}");
     }
 
     #[test]

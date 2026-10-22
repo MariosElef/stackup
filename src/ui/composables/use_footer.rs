@@ -157,6 +157,7 @@ impl App {
                 Page::Run | Page::Install if self.run.as_ref().is_some_and(|r| r.live()) => {
                     " Ctrl-] back to the menu (stops it) · every other key goes to the program"
                 }
+                Page::Install if self.celebration.is_some() => " any key skips",
                 Page::Run | Page::Install => " q back",
                 Page::New => "",
             })

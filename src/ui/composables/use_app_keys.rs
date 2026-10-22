@@ -26,9 +26,12 @@ impl App {
         if key.kind != KeyEventKind::Press {
             return;
         }
-        // Any key ends the goodbye early.
+        // Any key ends the goodbye early, and the celebration.
         if self.farewell.is_some() {
             return self.end_farewell();
+        }
+        if self.celebration.is_some() {
+            return self.end_celebration();
         }
         let ctrl = key.modifiers.contains(KeyModifiers::CONTROL);
         if self.tier_modal.is_some() {

@@ -211,6 +211,9 @@ pub struct App {
     pub removed: bool,
     /// The goodbye shown after a removal, until it ends or a key is pressed.
     pub farewell: Option<Farewell>,
+    /// Shown when an install or a creation finished well, until it ends or a key is pressed;
+    /// then the screen goes back on its own.
+    pub celebration: Option<crate::ui::components::celebration::Celebration>,
     /// What the project being removed was built with, read before its folder goes.
     pub removing: Option<Facts>,
     /// What the running action was, for what to remember when it succeeds.
@@ -293,6 +296,7 @@ impl App {
             run: None,
             after: None,
             removed: false,
+            celebration: None,
             farewell: None,
             removing: None,
             exe: std::env::current_exe().unwrap_or_else(|_| PathBuf::from("stackup")),

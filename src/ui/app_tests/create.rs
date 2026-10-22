@@ -331,6 +331,47 @@ fn install_runs_on_the_terminal_then_returns_to_the_wizard() {
 }
 
 #[test]
+fn a_finished_install_celebrates_then_goes_back_on_its_own() {
+    let mut app = app_at_the_wizard("celebrate");
+    let dir = scratch("celebrate-dir");
+    offer(&mut app, vec![echo(&dir, "echo ok")], vec![]);
+    press(&mut app, KeyCode::Enter);
+    assert_eq!(finish(&mut app), "done");
+    app.pump();
+    assert!(
+        app.celebration.is_some(),
+        "a finished install is celebrated"
+    );
+    // Once the check has drawn itself, the words come in.
+    thread::sleep(Duration::from_millis(700));
+    let s = screen(&app);
+    assert!(
+        s.contains("topcoat installed") && s.contains("back to the wizard"),
+        "{s}"
+    );
+
+    // It ends by itself, and the wizard is back as `q` would bring it.
+    for _ in 0..150 {
+        app.pump();
+        if app.celebration.is_none() {
+            break;
+        }
+        thread::sleep(Duration::from_millis(20));
+    }
+    assert!(app.celebration.is_none());
+    assert_eq!(app.page, Page::New);
+    let status = &app.wizard.as_ref().unwrap().status;
+    assert!(status.contains("press Create project again"), "{status}");
+
+    // A failure is not celebrated.
+    offer(&mut app, vec![echo(&dir, "exit 3")], vec![]);
+    press(&mut app, KeyCode::Enter);
+    assert_eq!(finish(&mut app), "failed (exit 3)");
+    app.pump();
+    assert!(app.celebration.is_none());
+}
+
+#[test]
 fn a_failed_install_says_so_and_changes_nothing() {
     let mut app = app_at_the_wizard("failed");
     let dir = scratch("failed-dir");

@@ -3,8 +3,8 @@ use crate::{
     ui::{features::create::wizard::Wizard, types::Outcome},
 };
 
-pub const TOOLS_TO_CHECK: [&str; 9] = [
-    "docker", "cargo", "uv", "pnpm", "topcoat", "git", "gh", "mkcert", "ssh",
+pub const TOOLS_TO_CHECK: [&str; 10] = [
+    "docker", "cargo", "uv", "pnpm", "topcoat", "git", "gh", "mkcert", "ssh", "sqlx",
 ];
 
 /// What a tool is for, in the message that says it is missing.
@@ -21,6 +21,7 @@ pub fn needed_for(bin: &str) -> &'static str {
         "gh" => "creating the GitHub repository and signing in with an SSH key",
         "mkcert" => "local HTTPS",
         "ssh" => "deploying to a server",
+        "sqlx" => "making, applying and reverting sqlx migrations",
         _ => "some projects",
     }
 }

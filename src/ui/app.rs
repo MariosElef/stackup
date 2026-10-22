@@ -7,7 +7,7 @@ use ratatui::{
 };
 
 use super::{
-    components::{autofix_modal, choice_modal, help_dialog, palette},
+    components::{autofix_modal, celebration, choice_modal, help_dialog, palette},
     composables::use_terminal::with_terminal,
     features::{
         create::{self, github_modal, requirements_modal, selection::Selection},
@@ -28,7 +28,7 @@ fn event_loop(terminal: &mut DefaultTerminal, app: &mut App) -> io::Result<()> {
         // what it printed in reply shows at once, not on the next slow beat.
         let wait = if app.run.as_ref().is_some_and(|r| r.live()) {
             8
-        } else if app.farewell.is_some() {
+        } else if app.farewell.is_some() || app.celebration.is_some() {
             // The goodbye is an animation: about 30 frames a second.
             30
         } else {
@@ -81,6 +81,9 @@ pub fn draw(f: &mut Frame, app: &App) {
             }
         }
     });
+    if let Some(c) = &app.celebration {
+        celebration::render(f, f.area(), c);
+    }
     if app.help {
         help_dialog::render_app(f, f.area());
     }
