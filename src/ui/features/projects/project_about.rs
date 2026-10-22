@@ -7,10 +7,11 @@ use ratatui::{
 };
 
 use crate::{
-    models::{Backend, Facts, Frontend},
+    models::Facts,
     services::projects::{
         envs,
         overview::{Overview, State},
+        stack::read_stack,
     },
     ui::{
         stores::app::App,
@@ -148,20 +149,24 @@ fn card(app: &App) -> Option<Card> {
     } else {
         lines.push(Line::from(""));
         lines.push(heading("Stack"));
-        let mut stack = vec![];
-        if facts.frontend != Frontend::None {
-            let name = facts.frontend.to_string();
-            stack.push(pill(&name, tech_color(&name)));
-            stack.push(Span::raw("  "));
+        let stack = read_stack(&p.path, &facts);
+        let mut built = vec![];
+        for name in stack
+            .frontend
+            .iter()
+            .take(1)
+            .chain(stack.backend.iter().take(1))
+        {
+            if !built.is_empty() {
+                built.push(Span::raw("  "));
+            }
+            built.push(pill(name, tech_color(name)));
         }
-        if facts.backend != Backend::None {
-            let name = facts.backend.to_string();
-            stack.push(pill(&name, tech_color(&name)));
+        if built.is_empty() {
+            built.push(Span::styled("none", Style::new().fg(GRAY)));
         }
-        if stack.is_empty() {
-            stack.push(Span::styled("none", Style::new().fg(GRAY)));
-        }
-        lines.push(row("built with", stack));
+        // The rest of the stack is on the project's own page: the card has no room for it.
+        lines.push(row("built with", built));
         lines.push(row(
             "features",
             vec![

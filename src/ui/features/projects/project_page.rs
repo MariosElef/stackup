@@ -6,7 +6,7 @@ use ratatui::{
 use crate::models::Action;
 use crate::ui::{
     components::output,
-    features::projects::{action_about, action_list, urls_strip},
+    features::projects::{action_about, action_list, stack_panel, urls_strip},
     stores::app::App,
     types::Page,
 };
@@ -23,8 +23,21 @@ pub fn render(f: &mut Frame, area: Rect, app: &App) {
     action_list::render(f, left, app);
     // Under what the right side shows, where the project can be reached.
     let strip = urls_strip::height(app, right.width);
-    let [top, bottom] =
-        Layout::vertical([Constraint::Min(5), Constraint::Length(strip)]).areas(right);
+    // The stack heads the page while nothing runs; a run's output gets the room instead.
+    let stack = if app.page == Page::Run {
+        0
+    } else {
+        stack_panel::height(app)
+    };
+    let [head, top, bottom] = Layout::vertical([
+        Constraint::Length(stack),
+        Constraint::Min(5),
+        Constraint::Length(strip),
+    ])
+    .areas(right);
+    if stack > 0 {
+        stack_panel::render(f, head, app);
+    }
     if app.page == Page::Run {
         output::render(f, top, app);
     } else {

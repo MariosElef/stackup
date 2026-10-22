@@ -88,6 +88,11 @@ pub fn act(action: Action, target: &Target, args: Args, confirmed: bool) -> Resu
                 project.name,
                 project.path.display()
             )
+        } else if action == Action::MigrationRevert {
+            format!(
+                "Reverting runs the last migration's down part on {}: it can drop tables and their data.",
+                project.name
+            )
         } else if action == Action::VolumeRestore {
             format!(
                 "Restoring {} from {} replaces what is in the volume, and stops what uses it.",

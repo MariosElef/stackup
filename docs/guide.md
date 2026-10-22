@@ -319,7 +319,10 @@ stop           Stop the containers and keep them stopped, also after a restart
 images  clean  List the images the project built; delete its containers and those images
 volumes        The volumes and which service mounts each; `volume add|backup|restore` below
 cargo-clean    Delete the Rust build files (target/), which grow with every build; shows how much it frees
-dev            Start the databases in Docker and run the backend with reload
+dev            Start the databases in Docker and run the backend and the frontend with reload
+migrate        Apply the migrations not applied yet (sqlx for axum, Alembic for FastAPI)
+migration new NAME     Make the next migration in backend/migrations
+migration revert       Undo the last migration
 start PART     Run backend, frontend or fullstack for development (what the IDE buttons call)
 ide            Write the IDE run configurations (Start backend / frontend / fullstack) and the VS Code
                extensions; `--install-extensions` installs those with the `code` command

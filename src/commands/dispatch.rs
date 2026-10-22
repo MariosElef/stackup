@@ -235,6 +235,21 @@ pub fn run() -> Result<()> {
             true,
         ),
         Cmd::Dev(t) => act(Action::Dev, &t, Args::default(), true),
+        Cmd::Migrate(t) => act(Action::Migrate, &t, Args::default(), true),
+        Cmd::Migration { cmd } => match cmd {
+            MigrationCmd::New { target, name } => act(
+                Action::MigrationNew,
+                &target,
+                Args {
+                    name: Some(name),
+                    ..Args::default()
+                },
+                true,
+            ),
+            MigrationCmd::Revert { target, yes } => {
+                act(Action::MigrationRevert, &target, Args::default(), yes)
+            }
+        },
         Cmd::Start { part, target } => start(&part, &target),
         Cmd::Ide {
             target,

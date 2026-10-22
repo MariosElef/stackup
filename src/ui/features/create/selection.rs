@@ -57,8 +57,9 @@ impl Selection {
 
     /// Backend libraries belong to a backend; says why when the chosen one cannot use this one.
     pub fn toggle_be_lib(&mut self, lib: BeLib) -> Result<(), &'static str> {
-        if !lib.works_with(self.backend) {
-            return Err("utoipa needs the axum backend");
+        let postgres = self.services.contains(&Service::Postgres);
+        if let Some(why) = lib.why_not(self.backend, postgres) {
+            return Err(why);
         }
         toggle(&mut self.be_libs, lib);
         Ok(())

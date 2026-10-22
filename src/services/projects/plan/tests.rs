@@ -240,6 +240,30 @@ fn start_runs_the_part_that_was_built_or_both_together() {
 }
 
 #[test]
+fn dev_runs_the_backend_and_the_frontend_together_when_there_are_both() {
+    if !docker_here() {
+        return;
+    }
+    let (p, f) = project(
+        "devboth",
+        &["backend/Cargo.toml", "frontend/nuxt.config.ts", ".env"],
+    );
+    fs::write(
+        p.path.join("docker-compose.yml"),
+        "services:\n  backend:\n    image: x\n",
+    )
+    .unwrap();
+    let steps = lines(&plan(Action::Dev, &p, &f, &Args::default()).unwrap());
+    assert_eq!(steps, lines(&start(Part::Fullstack, &p, &f).unwrap()));
+    let last = steps.last().unwrap();
+    assert!(
+        last.contains("(cd backend && cargo watch -x run)")
+            && last.contains("(cd frontend && pnpm dev)"),
+        "{last}"
+    );
+}
+
+#[test]
 fn dev_sets_up_and_starts_the_https_proxy_for_the_servers_it_runs_here() {
     if !docker_here() || urls::listening(https_dev::PORT) {
         return;
@@ -626,4 +650,48 @@ fn volumes_are_offered_only_where_there_is_something_to_back_up() {
         Action::VolumeAdd.applies(&none),
         "a first volume can always be added"
     );
+}
+
+#[test]
+fn migrations_run_with_the_backends_own_tool_against_postgres() {
+    let (p, f) = project(
+        "migrate",
+        &["backend/Cargo.toml", "backend/migrations/0001_init.up.sql"],
+    );
+    assert!(f.migrations);
+    let migrate = lines(&plan(Action::Migrate, &p, &f, &Args::default()).unwrap());
+    assert_eq!(
+        migrate,
+        ["docker compose up -d --wait postgres", "sqlx migrate run"]
+    );
+    let args = Args {
+        name: Some("add_users".into()),
+        ..Args::default()
+    };
+    let new = lines(&plan(Action::MigrationNew, &p, &f, &args).unwrap());
+    assert_eq!(
+        new,
+        ["sqlx migrate add -r --sequential add_users"],
+        "no database needed"
+    );
+    assert!(plan(Action::MigrationNew, &p, &f, &Args::default()).is_err());
+    let revert = lines(&plan(Action::MigrationRevert, &p, &f, &Args::default()).unwrap());
+    assert_eq!(revert.last().unwrap(), "sqlx migrate revert");
+    assert!(Action::MigrationRevert.risky());
+
+    let (p, f) = project(
+        "alembic",
+        &["backend/pyproject.toml", "backend/migrations/env.py"],
+    );
+    let migrate = lines(&plan(Action::Migrate, &p, &f, &Args::default()).unwrap());
+    assert_eq!(migrate[1], "uv run alembic upgrade head");
+    let new = lines(&plan(Action::MigrationNew, &p, &f, &args).unwrap());
+    assert_eq!(new, ["uv run alembic revision -m add_users"]);
+    let revert = lines(&plan(Action::MigrationRevert, &p, &f, &Args::default()).unwrap());
+    assert_eq!(revert[1], "uv run alembic downgrade -1");
+
+    // Without migrations the actions are not offered.
+    let (p, f) = project("nomigrate", &["backend/Cargo.toml"]);
+    assert!(!f.migrations);
+    assert!(plan(Action::Migrate, &p, &f, &Args::default()).is_err());
 }

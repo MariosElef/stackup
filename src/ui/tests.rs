@@ -468,3 +468,38 @@ fn utoipa_is_an_axum_only_backend_library() {
     a.sel.backend = Backend::None;
     assert!(a.plan().be_libs.is_empty());
 }
+
+#[test]
+fn each_backend_ticks_its_own_migrations_and_both_need_postgres() {
+    let mut a = app();
+    let row = |a: &Wizard, lib: BeLib| a.rows.iter().position(|r| *r == Row::BeLib(lib)).unwrap();
+    let s = screen(&a);
+    assert!(
+        s.contains("sqlx migrations") && s.contains("Alembic migrations"),
+        "{s}"
+    );
+
+    // axum with Postgres, as recommended: sqlx ticks, Alembic does not.
+    a.cursor = row(&a, BeLib::Sqlx);
+    press(&mut a, KeyCode::Enter);
+    assert_eq!(a.sel.be_libs, vec![BeLib::Sqlx]);
+    assert!(a.requires().contains(&"sqlx"), "its actions run sqlx-cli");
+    a.cursor = row(&a, BeLib::Alembic);
+    press(&mut a, KeyCode::Enter);
+    assert_eq!(a.sel.be_libs, vec![BeLib::Sqlx]);
+    assert!(a.status.contains("FastAPI"), "{}", a.status);
+
+    // FastAPI: Alembic ticks, and the plan drops sqlx.
+    a.sel.backend = Backend::Fastapi;
+    press(&mut a, KeyCode::Enter);
+    assert!(a.sel.be_libs.contains(&BeLib::Alembic));
+    assert_eq!(a.plan().be_libs, vec![BeLib::Alembic]);
+
+    // Without Postgres there is nothing to migrate.
+    a.sel.services.retain(|s| *s != Service::Postgres);
+    assert!(a.plan().be_libs.is_empty());
+    a.sel.be_libs.clear();
+    press(&mut a, KeyCode::Enter);
+    assert!(a.sel.be_libs.is_empty());
+    assert!(a.status.contains("Postgres"), "{}", a.status);
+}

@@ -1,0 +1,1 @@
+-- Undoes 0001_init.up.sql: `stackup` > revert migration (`sqlx migrate revert`).

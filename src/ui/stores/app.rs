@@ -196,6 +196,8 @@ pub struct App {
     /// The actions that apply to the open project, and which one the cursor is on.
     pub actions: Vec<Action>,
     pub action: usize,
+    /// `dev` asks in its panel which part to start: the row picked, while it asks.
+    pub dev_part: Option<usize>,
     /// What the open project's folder holds.
     pub facts: Option<Facts>,
     pub prompt: Option<Prompt>,
@@ -237,8 +239,12 @@ pub struct App {
     pub env: Option<String>,
     /// Where git is for the open project: branch, changes, ahead and behind.
     pub git: Option<GitInfo>,
-    /// Where the open project is reachable, read when it was opened.
+    /// Where the open project is reachable, read when it was opened; whether each answers is
+    /// asked again every second, so a server that has just started shows up.
     pub urls: Urls,
+    pub urls_probed: std::time::Instant,
+    /// What the open project is made of, read when it was opened.
+    pub stack: crate::services::projects::stack::Stack,
     /// A quick look at the project selected in the list: read when it is selected, not every frame.
     pub overview: Option<(PathBuf, crate::services::projects::overview::Overview)>,
     /// How much room each project takes, measured away from the screen (a big `target/` takes a
@@ -278,6 +284,9 @@ impl App {
             cursor: 0,
             actions: vec![],
             action: 0,
+            urls_probed: std::time::Instant::now(),
+            stack: Default::default(),
+            dev_part: None,
             facts: None,
             prompt: None,
             status: String::new(),

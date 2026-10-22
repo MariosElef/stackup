@@ -190,14 +190,19 @@ pub fn normalize_libs(frontend: Frontend, libs: &mut Vec<FeLib>) -> Vec<String> 
 
 /// Backend libraries only apply to the backends they work with. Returns what was dropped, to tell
 /// the user.
-pub fn normalize_be_libs(backend: Backend, libs: &mut Vec<BeLib>) -> Vec<String> {
+pub fn normalize_be_libs(
+    backend: Backend,
+    services: &[Service],
+    libs: &mut Vec<BeLib>,
+) -> Vec<String> {
     let mut notes = Vec::new();
+    let postgres = services.contains(&Service::Postgres);
     libs.retain(|l| {
-        let keep = l.works_with(backend);
-        if !keep {
-            notes.push(format!("{l} needs the axum backend, so it was dropped"));
+        let why = l.why_not(backend, postgres);
+        if let Some(why) = why {
+            notes.push(format!("{l} was dropped: {why}"));
         }
-        keep
+        why.is_none()
     });
     notes
 }

@@ -132,6 +132,15 @@ impl App {
                 }
                 match param {
                     Param::Host => args.host = Some(value),
+                    Param::MigrationName => {
+                        if !migration_name(&value) {
+                            self.status = format!(
+                                "`{value}` is not a migration name: letters, digits and _, like add_users"
+                            );
+                            return;
+                        }
+                        args.name = Some(value);
+                    }
                     Param::Tier => args.tier = Some(value),
                     Param::VolumeName => {
                         if !volumes::valid_name(&value) && !volumes::valid_folder(&value) {
@@ -169,4 +178,9 @@ impl App {
             }
         }
     }
+}
+
+/// A name both tools put in a file name as is: `add_users`.
+fn migration_name(name: &str) -> bool {
+    !name.is_empty() && name.chars().all(|c| c.is_ascii_alphanumeric() || c == '_')
 }

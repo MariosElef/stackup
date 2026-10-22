@@ -1,4 +1,6 @@
-use crate::models::{AXUM_LAYERS, Backend, FASTAPI_LAYERS, FeLib, Frontend, Plan, Service, Tool};
+use crate::models::{
+    AXUM_LAYERS, Backend, BeLib, FASTAPI_LAYERS, FeLib, Frontend, Plan, Service, Tool,
+};
 
 #[derive(Clone)]
 pub enum Node {
@@ -133,6 +135,13 @@ pub fn file_tree(plan: &Plan) -> Vec<Node> {
                 "src",
                 [vec![file("main.rs")], layers(AXUM_LAYERS)].concat(),
             )];
+            if plan.be_lib(BeLib::Sqlx) {
+                kids.push(dir(
+                    "migrations",
+                    files(&["0001_init.up.sql", "0001_init.down.sql"]),
+                ));
+                kids.push(file("build.rs"));
+            }
             kids.push(file("Cargo.toml"));
             if !plan.rust_workspace() {
                 kids.extend(files(&["rust-toolchain.toml", "Dockerfile"]));
@@ -147,6 +156,17 @@ pub fn file_tree(plan: &Plan) -> Vec<Node> {
             let mut app = vec![file("__init__.py"), file("main.py")];
             app.extend(FASTAPI_LAYERS.iter().map(|n| pkg(n)));
             let mut kids = vec![dir("app", app), dir("tests", vec![file("test_health.py")])];
+            if plan.be_lib(BeLib::Alembic) {
+                kids.push(dir(
+                    "migrations",
+                    vec![
+                        dir("versions", vec![file("…_init.py")]),
+                        file("env.py"),
+                        file("script.py.mako"),
+                    ],
+                ));
+                kids.push(file("alembic.ini"));
+            }
             kids.extend(files(&["pyproject.toml", "Dockerfile"]));
             if lint {
                 kids.push(file("taplo.toml"));

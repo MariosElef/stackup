@@ -82,6 +82,16 @@ fn topcoat(m: &dyn Machine, dir: &Path, picks: &Picks) -> Option<Vec<Step>> {
     ])
 }
 
+/// sqlx-cli, with only what a Postgres project needs.
+const SQLX_CLI: &[&str] = &[
+    "install",
+    "sqlx-cli",
+    "--no-default-features",
+    "--features",
+    "rustls,postgres",
+    "--locked",
+];
+
 /// The winget package for a tool, on a Windows machine.
 fn winget_id(bin: &str) -> Option<&'static str> {
     Some(match bin {
@@ -121,6 +131,7 @@ fn command(bin: &str, m: &dyn Machine, dir: &Path, picks: &Picks) -> Option<Vec<
     }
     match bin {
         "topcoat" => topcoat(m, dir, picks),
+        "sqlx" if m.has("cargo") => one("cargo", SQLX_CLI),
         "mkcert" if m.has("brew") => one("brew", &["install", "mkcert"]),
         "gh" if m.has("brew") => one("brew", &["install", "gh"]),
         "lazygit" if m.has("brew") => one("brew", &["install", "lazygit"]),

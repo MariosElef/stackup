@@ -3,10 +3,10 @@ use std::path::Path;
 
 use anyhow::{Context, Result, bail};
 
-use super::{DATABASES, compose_step, plan};
+use super::{DATABASES, compose_step};
 use crate::{
     clients::docker,
-    models::{Action, Args, Backend, Facts, Frontend, Project, Step},
+    models::{Args, Backend, Facts, Frontend, Project, Step},
     services::projects::{
         certs, compose, envs, https_dev,
         ide::{Part, parts},
@@ -126,18 +126,51 @@ fn https_steps(root: &Path) -> Vec<Step> {
     steps
 }
 
-/// What `dev` runs.
-pub(super) fn dev(root: &Path, facts: &Facts) -> Result<Vec<Step>> {
-    Ok({
-        let config = docker::config(root)?;
-        let infra = compose::present(&config, &DATABASES);
-        let mut steps = vec![];
-        if !infra.is_empty() {
-            let mut up = vec!["up", "-d"];
-            up.extend(infra.iter().map(String::as_str));
-            steps.push(compose_step("start the databases", root, &up));
+/// What `dev` runs: the part asked for (or only the databases), or else the backend and the
+/// frontend together when the project has both, and the one it has when not.
+pub(super) fn dev(p: &Project, facts: &Facts, args: &Args) -> Result<Vec<Step>> {
+    let part = match args.part.as_deref() {
+        Some(DATABASES_ONLY) => {
+            let steps = databases(&p.path)?;
+            if steps.is_empty() {
+                bail!("this project has no databases");
+            }
+            return Ok(steps);
         }
+        Some(part) => Part::parse(part)?,
+        None => *parts(facts)
+            .last()
+            .context("this project has nothing to start")?,
+    };
+    start(part, p, facts)
+}
+
+/// What `dev` is given to start only the databases, with no server.
+pub const DATABASES_ONLY: &str = "databases";
+
+/// Starts the project's databases in Docker, in the background; nothing when it has none.
+fn databases(root: &Path) -> Result<Vec<Step>> {
+    let config = docker::config(root)?;
+    let infra = compose::present(&config, &DATABASES);
+    if infra.is_empty() {
+        return Ok(vec![]);
+    }
+    // `--wait`: the backend connects (and migrates) as it starts, so they must be answering.
+    let mut up = vec!["up", "-d", "--wait"];
+    up.extend(infra.iter().map(String::as_str));
+    Ok(vec![compose_step("start the databases", root, &up)])
+}
+
+/// The databases in Docker and the backend with reload.
+fn backend_dev(root: &Path, facts: &Facts) -> Result<Vec<Step>> {
+    Ok({
+        let mut steps = databases(root)?;
         steps.extend(https_steps(root));
+        // Alembic runs apart from the app: the database is brought up to date before it starts.
+        // (An axum backend applies its migrations itself.)
+        if facts.migrations && facts.backend == Backend::Fastapi {
+            steps.push(super::migrations::apply(root, facts)?);
+        }
         let backend = root.join("backend");
         let mut run = match facts.backend {
             Backend::Axum => Step::new(
@@ -190,8 +223,8 @@ fn frontend_dev(facts: &Facts) -> (&'static str, &'static [&'static str]) {
     }
 }
 
-/// Starts one part of the project for development, or both together. The backend part is what
-/// `dev` does (databases in Docker, the backend with reload); the frontend runs on this machine.
+/// Starts one part of the project for development, or both together. The backend part is the
+/// databases in Docker and the backend with reload; the frontend runs on this machine.
 pub fn start(part: Part, p: &Project, facts: &Facts) -> Result<Vec<Step>> {
     let root = p.path.as_path();
     if !facts.exists {
@@ -200,7 +233,6 @@ pub fn start(part: Part, p: &Project, facts: &Facts) -> Result<Vec<Step>> {
     if !parts(facts).contains(&part) {
         bail!("this project has no {}", part.cli());
     }
-    let args = Args::default();
     let front = frontend_dev(facts);
     // The proxy is a container: on Linux it reaches this machine through the Docker bridge, not
     // through localhost, so the dev server has to listen on every address. (Docker Desktop on a
@@ -215,7 +247,7 @@ pub fn start(part: Part, p: &Project, facts: &Facts) -> Result<Vec<Step>> {
         }
     };
     match part {
-        Part::Backend => plan(Action::Dev, p, facts, &args),
+        Part::Backend => backend_dev(root, facts),
         Part::Frontend => {
             let mut steps = https_steps(root);
             steps.push(internal::banner(root, "frontend"));
@@ -223,7 +255,7 @@ pub fn start(part: Part, p: &Project, facts: &Facts) -> Result<Vec<Step>> {
             Ok(steps)
         }
         Part::Fullstack => {
-            let mut steps = plan(Action::Dev, p, facts, &args)?;
+            let mut steps = backend_dev(root, facts)?;
             // Both servers stay up in one step; stopping it (Ctrl-C, or the IDE's stop) ends both.
             let back = steps.pop().context("no backend step")?;
             // One banner for both, in place of the backend's.

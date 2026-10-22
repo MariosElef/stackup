@@ -125,7 +125,7 @@ pub fn create(c: Create) -> Result<()> {
         println!("note: {note}");
     }
     let mut be_libs = sel.be_libs;
-    for note in normalize_be_libs(sel.backend, &mut be_libs) {
+    for note in normalize_be_libs(sel.backend, &sel.services, &mut be_libs) {
         println!("note: {note}");
     }
     let plan = Plan {

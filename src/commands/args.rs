@@ -65,6 +65,25 @@ pub enum VolumeCmd {
 }
 
 #[derive(Subcommand)]
+pub enum MigrationCmd {
+    /// Make the next migration's files in backend/migrations.
+    New {
+        #[command(flatten)]
+        target: Target,
+        /// What it does, like add_users: it names the files.
+        name: String,
+    },
+    /// Undo the last migration.
+    Revert {
+        #[command(flatten)]
+        target: Target,
+        /// Do not ask for the project's name to be typed back.
+        #[arg(long)]
+        yes: bool,
+    },
+}
+
+#[derive(Subcommand)]
 pub enum GitCmd {
     /// Open lazygit on the project.
     Open(Target),
@@ -119,7 +138,8 @@ pub enum Cmd {
         backend: Option<Backend>,
         #[arg(long, value_enum, value_delimiter = ',', num_args = 0..)]
         libs: Option<Vec<FeLib>>,
-        /// Libraries for the backend (only utoipa for now, which needs axum).
+        /// Libraries for the backend: utoipa and sqlx migrations need axum, Alembic migrations need
+        /// FastAPI, and both migrations need Postgres.
         #[arg(long, value_enum, value_delimiter = ',', num_args = 0..)]
         backend_libs: Option<Vec<BeLib>>,
         #[arg(long, value_enum, value_delimiter = ',', num_args = 0..)]
@@ -189,8 +209,15 @@ pub enum Cmd {
         target: Target,
         service: Option<String>,
     },
-    /// Start the databases in Docker and run the backend with reload.
+    /// Start the databases in Docker and run the backend and the frontend with reload.
     Dev(Target),
+    /// Apply the migrations not applied yet (sqlx for axum, Alembic for FastAPI).
+    Migrate(Target),
+    /// Make a migration, or undo the last one.
+    Migration {
+        #[command(subcommand)]
+        cmd: MigrationCmd,
+    },
     /// Run the backend, the frontend, or both together, for development.
     Start {
         /// backend, frontend or fullstack.

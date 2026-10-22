@@ -398,6 +398,7 @@ mod tests {
             remote: false,
             rust_build: false,
             has_volumes: false,
+            migrations: false,
         }
     }
 

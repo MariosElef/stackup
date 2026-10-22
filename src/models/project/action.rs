@@ -1,4 +1,4 @@
-use crate::models::{Backend, Facts};
+use crate::models::{Backend, Facts, Frontend};
 
 /// What can be done to a project. The same list is the menu and the command line.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -11,6 +11,12 @@ pub enum Action {
     Clean,
     Logs,
     Dev,
+    /// Apply the migrations not applied yet.
+    Migrate,
+    /// Make the next migration's files.
+    MigrationNew,
+    /// Undo the last migration.
+    MigrationRevert,
     Build,
     Deploy,
     Ci,
@@ -40,6 +46,7 @@ pub enum Action {
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum Group {
     Run,
+    Database,
     Ship,
     Docker,
     Environment,
@@ -51,6 +58,7 @@ impl Group {
     pub fn label(self) -> &'static str {
         match self {
             Group::Run => "Run",
+            Group::Database => "Database",
             Group::Ship => "Build & ship",
             Group::Docker => "Docker",
             Group::Environment => "Environment",
@@ -79,6 +87,8 @@ pub enum Param {
     VolumePick,
     /// Which backup file: picked.
     BackupFile,
+    /// What a new migration is about, which names its files: typed.
+    MigrationName,
 }
 
 impl Action {
@@ -87,6 +97,9 @@ impl Action {
         Action::Down,
         Action::Logs,
         Action::Dev,
+        Action::Migrate,
+        Action::MigrationNew,
+        Action::MigrationRevert,
         Action::Ps,
         Action::Stop,
         Action::Images,
@@ -121,6 +134,9 @@ impl Action {
             Action::Clean => "clean",
             Action::Logs => "logs",
             Action::Dev => "dev",
+            Action::Migrate => "migrate",
+            Action::MigrationNew => "new-migration",
+            Action::MigrationRevert => "revert-migration",
             Action::Build => "build",
             Action::Deploy => "deploy",
             Action::Ci => "ci",
@@ -145,6 +161,8 @@ impl Action {
     pub fn label(self) -> &'static str {
         match self {
             Action::CargoClean => "cargo clean",
+            Action::MigrationNew => "new migration",
+            Action::MigrationRevert => "revert",
             Action::VolumeAdd => "add volume",
             Action::VolumeBackup => "backup volume",
             Action::VolumeRestore => "restore volume",
@@ -158,6 +176,7 @@ impl Action {
     pub fn group(self) -> Group {
         match self {
             Action::Up | Action::Down | Action::Logs | Action::Dev => Group::Run,
+            Action::Migrate | Action::MigrationNew | Action::MigrationRevert => Group::Database,
             Action::Ps
             | Action::Stop
             | Action::Images
@@ -184,7 +203,10 @@ impl Action {
             Action::Images => "The images this project built, and their size",
             Action::Clean => "Delete the containers and the images this project built",
             Action::Logs => "Follow the logs of every service",
-            Action::Dev => "Databases in Docker, the backend with reload",
+            Action::Dev => "Databases in Docker, the backend and the frontend with reload",
+            Action::Migrate => "Apply the migrations not applied yet",
+            Action::MigrationNew => "Make the next migration",
+            Action::MigrationRevert => "Undo the last migration",
             Action::Build => "Build the Docker images",
             Action::Deploy => "Build for linux, send the images over SSH, start them",
             Action::Ci => "Run the checks CI runs",
@@ -224,7 +246,16 @@ impl Action {
             }
             Action::Logs => "docker compose logs --follow --tail 100, until stopped.",
             Action::Dev => {
-                "Starts only the databases in Docker, then runs the backend on this machine with reload (cargo watch, or uvicorn), so you can debug it."
+                "Asks what to start: both, the backend or the frontend. The databases run in Docker; the backend (cargo watch, or uvicorn) and the frontend run on this machine with reload, so you can debug them. Ctrl-C stops them."
+            }
+            Action::Migrate => {
+                "Starts Postgres in Docker, then applies what is new in backend/migrations: sqlx migrate run (axum) or alembic upgrade head (FastAPI). The backend also does this each time it starts, in dev and in Docker."
+            }
+            Action::MigrationNew => {
+                "Asks what it is about (add_users), then writes its files in backend/migrations: an up and a down .sql (sqlx migrate add -r --sequential), or a revision with upgrade and downgrade (alembic revision). Fill them in; the next start applies it."
+            }
+            Action::MigrationRevert => {
+                "Runs the last migration's down part: sqlx migrate revert (axum) or alembic downgrade -1 (FastAPI). It can drop tables and their data, so the project's name is typed back first."
             }
             Action::Build => {
                 "docker compose build, for this machine. To build for a server, use deploy."
@@ -280,7 +311,8 @@ impl Action {
     pub fn applies(self, f: &Facts) -> bool {
         f.exists
             && match self {
-                Action::Dev => f.backend != Backend::None,
+                Action::Dev => f.backend != Backend::None || f.frontend != Frontend::None,
+                Action::Migrate | Action::MigrationNew | Action::MigrationRevert => f.migrations,
                 Action::Ci => f.ci,
                 Action::Certs => f.https,
                 Action::Hooks => f.hooks,
@@ -296,6 +328,7 @@ impl Action {
     pub fn params(self) -> &'static [Param] {
         match self {
             Action::Deploy => &[Param::Host],
+            Action::MigrationNew => &[Param::MigrationName],
             Action::Env => &[Param::Tier],
             Action::GitRepo => &[Param::Visibility],
             Action::Remove => &[Param::RemoveFrom],
@@ -311,7 +344,7 @@ impl Action {
     pub fn risky(self) -> bool {
         matches!(
             self,
-            Action::Deploy | Action::Remove | Action::VolumeRestore
+            Action::Deploy | Action::Remove | Action::VolumeRestore | Action::MigrationRevert
         )
     }
 }

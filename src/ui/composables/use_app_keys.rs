@@ -154,6 +154,9 @@ impl App {
 
     fn project_key(&mut self, key: KeyEvent) {
         self.status.clear();
+        if self.dev_part.is_some() {
+            return self.dev_part_key(key);
+        }
         if let Some(m) = self.motion(key) {
             self.action = Self::moved(self.action, self.actions.len(), m);
             return;
@@ -167,6 +170,21 @@ impl App {
             KeyCode::Char('e') => self.run_from_palette(Action::Env),
             KeyCode::Char('h' | 'q') | KeyCode::Esc => self.back(),
             KeyCode::Char('?') => self.help = true,
+            _ => {}
+        }
+    }
+
+    /// In `dev`'s panel: `j`/`k` pick the part, Enter starts it, Esc goes back to the actions.
+    fn dev_part_key(&mut self, key: KeyEvent) {
+        let last = self.dev_parts().len().saturating_sub(1);
+        let Some(row) = &mut self.dev_part else {
+            return;
+        };
+        match key.code {
+            KeyCode::Down | KeyCode::Char('j') => *row = (*row + 1).min(last),
+            KeyCode::Up | KeyCode::Char('k') => *row = row.saturating_sub(1),
+            KeyCode::Enter | KeyCode::Char('l' | ' ') => self.start_dev_part(),
+            KeyCode::Esc | KeyCode::Char('h' | 'q') => self.dev_part = None,
             _ => {}
         }
     }

@@ -30,6 +30,8 @@ pub struct Facts {
     pub rust_build: bool,
     /// The compose file declares named volumes: something to back up.
     pub has_volumes: bool,
+    /// The backend keeps migrations in `backend/migrations`: sqlx's or Alembic's.
+    pub migrations: bool,
 }
 
 impl Facts {
@@ -62,6 +64,7 @@ impl Facts {
             remote: std::fs::read_to_string(root.join(".git/config"))
                 .is_ok_and(|c| c.contains("[remote \"origin\"]")),
             // A top-level `volumes:` is where a compose file declares its named volumes.
+            migrations: has("backend/migrations"),
             has_volumes: std::fs::read_to_string(root.join("docker-compose.yml"))
                 .is_ok_and(|t| t.lines().any(|l| l.trim_end() == "volumes:")),
             // A workspace has one `target/` at the root; separate crates have their own.

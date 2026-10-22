@@ -259,6 +259,7 @@ mod tests {
             remote: false,
             rust_build: false,
             has_volumes: false,
+            migrations: false,
         };
         let bare = Farewell::new("shop", "x", None).sprite();
         let dressed = Farewell::new("shop", "x", Some(&facts)).sprite();

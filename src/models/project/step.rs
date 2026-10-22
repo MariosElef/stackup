@@ -77,4 +77,9 @@ pub struct Args {
     pub mount: Option<String>,
     /// A backup file in the project's `backups/` folder.
     pub backup: Option<String>,
+    /// What `dev` starts: `backend`, `frontend` or `fullstack`; everything the project has when
+    /// not given.
+    pub part: Option<String>,
+    /// What a new migration is about: `add_users`.
+    pub name: Option<String>,
 }

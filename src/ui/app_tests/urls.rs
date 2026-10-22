@@ -16,6 +16,7 @@ pub(super) fn some_urls() -> Urls {
             link("api", "http://localhost:8000", Some(false)),
         ],
         data: vec![link("postgres", "postgres://localhost:5432", None)],
+        logins: vec![],
     }
 }
 

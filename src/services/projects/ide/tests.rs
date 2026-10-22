@@ -21,6 +21,7 @@ fn facts(frontend: Frontend, backend: Backend) -> Facts {
         remote: false,
         rust_build: false,
         has_volumes: false,
+        migrations: false,
     }
 }
 

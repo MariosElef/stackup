@@ -69,18 +69,21 @@ fn find<'a>(links: &'a [Link], label: &str) -> Option<&'a Link> {
 }
 
 fn backend(facts: &Facts, links: &[Link]) -> Option<Part> {
-    let (name, icon, ink, runs) = match facts.backend {
+    // The path the link opens: the api has no page at `/`, so a bare address is a blank 404.
+    let (name, icon, ink, runs, page) = match facts.backend {
         Backend::Axum => (
             "axum",
             &logos::FERRIS,
             (0xF7, 0x4C, 0x00),
             "cargo watch -x run",
+            "/health",
         ),
         Backend::Fastapi => (
             "FastAPI",
             &logos::FASTAPI,
             (0x00, 0xB8, 0xA9),
             "uv run uvicorn app.main:app --reload",
+            "/docs",
         ),
         Backend::None => return None,
     };
@@ -91,9 +94,10 @@ fn backend(facts: &Facts, links: &[Link]) -> Option<Part> {
         ink,
         runs: runs.into(),
         folder: "backend",
-        here: find(links, "api").map_or("http://localhost:8000".into(), |l| l.url.clone()),
-        secure: find(links, "api (https)").map(|l| l.url.clone()),
-        secure_up: find(links, "api (https)").is_some_and(answering),
+        here: find(links, "api").map_or("http://localhost:8000".into(), |l| l.url.clone()) + page,
+        secure: find(links, "api (https)").map(|l| format!("{}{page}", l.url)),
+        secure_up: find(links, "api (https)").is_some_and(answering)
+            && find(links, "api").is_some_and(answering),
         started: true,
     })
 }
@@ -119,7 +123,10 @@ fn frontend(facts: &Facts, links: &[Link]) -> Option<Part> {
         folder: "frontend",
         here: find(links, "app").map_or("http://localhost:3000".into(), |l| l.url.clone()),
         secure: find(links, "app (https)").map(|l| l.url.clone()),
-        secure_up: find(links, "app (https)").is_some_and(answering),
+        secure_up: find(links, "app (https)").is_some_and(answering)
+            && (find(links, "app").is_some_and(answering)
+                || (facts.frontend == Frontend::Vue
+                    && urls::listening(super::https_dev::VITE_PORT))),
         started: true,
     })
 }
@@ -170,7 +177,10 @@ fn block(part: &Part) -> Vec<String> {
         text.push(if part.secure_up {
             format!("{DIM}https  {RESET}{CYAN}{UNDERLINE}{secure}{RESET}")
         } else {
-            format!("{DIM}https  {secure}  not running: `stackup up` starts the proxy{RESET}")
+            format!(
+                "{DIM}https  {secure}  not running: needs the proxy and this {} started{RESET}",
+                part.role
+            )
         });
     }
     text.push(if part.started {
@@ -195,7 +205,9 @@ fn block(part: &Part) -> Vec<String> {
 pub fn banner(root: &Path, facts: &Facts, which: Which) -> String {
     let config = docker::config(root).unwrap_or(Value::Null);
     let caddyfile = std::fs::read_to_string(root.join("Caddyfile")).ok();
-    let urls = urls::links(&config, caddyfile.as_deref());
+    let mut urls = urls::links(&config, caddyfile.as_deref());
+    // The databases' addresses with what to sign in with, ready to paste into a client.
+    urls::add_logins(&mut urls, &super::envs::dotenv(root));
     // Every part the project has: the ones this start runs, then the others as not started, so
     // each address is on the screen.
     let mut parts = vec![];
@@ -255,6 +267,7 @@ mod tests {
             remote: false,
             rust_build: false,
             has_volumes: false,
+            migrations: false,
         }
     }
 
@@ -292,10 +305,13 @@ mod tests {
         let f = facts(Frontend::Topcoat, Backend::Axum);
         let back = plain(&block(&backend(&f, &links()).unwrap()).join("\n"));
         assert!(back.contains("backend axum"), "{back}");
-        assert!(back.contains("http://localhost:8000"), "{back}");
-        assert!(back.contains("https://api.localhost:58443"), "{back}");
+        assert!(back.contains("http://localhost:8000/health"), "{back}");
         assert!(
-            back.contains("not running: `stackup up`"),
+            back.contains("https://api.localhost:58443/health"),
+            "{back}"
+        );
+        assert!(
+            back.contains("not running: needs the proxy and this backend started"),
             "nothing answers on 58443: {back}"
         );
         assert!(back.contains("cargo watch -x run  in backend/"), "{back}");

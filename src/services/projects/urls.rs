@@ -24,6 +24,70 @@ pub struct Link {
 pub struct Urls {
     pub web: Vec<Link>,
     pub data: Vec<Link>,
+    /// How to sign in to each piece that asks, by its label: shown under its address, so a
+    /// database client can be pointed at it without opening `.env`.
+    pub logins: Vec<Login>,
+}
+
+/// What a client's connection form takes for one piece, a line of fields at a time, named as
+/// the forms name them: `host localhost  port 5432`, then `user app  password change-me ...`.
+/// A field with no value is a note: `no password`.
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct Login {
+    pub label: String,
+    pub lines: Vec<Vec<(&'static str, String)>>,
+}
+
+/// The sign-ins, from the active `.env`, or the compose file's defaults where it says nothing.
+/// The Postgres address gets them too, so it can be copied into a client whole.
+pub fn add_logins(urls: &mut Urls, env: &[(String, String)]) {
+    let var = |key: &str, default: &str| {
+        env.iter()
+            .find(|(k, _)| k == key)
+            .map_or(default.to_string(), |(_, v)| v.clone())
+    };
+    for l in &mut urls.data {
+        let Some(port) = port_of(&l.url) else {
+            continue;
+        };
+        let host = vec![
+            ("host", "localhost".to_string()),
+            ("port", port.to_string()),
+        ];
+        let lines = match l.label.as_str() {
+            "postgres" => {
+                let (user, password, db) = (
+                    var("POSTGRES_USER", "app"),
+                    var("POSTGRES_PASSWORD", "change-me"),
+                    var("POSTGRES_DB", "app"),
+                );
+                l.url = format!("postgres://{user}:{password}@localhost:{port}/{db}");
+                vec![
+                    host,
+                    vec![("user", user), ("password", password), ("database", db)],
+                ]
+            }
+            "redis" | "mongo" => {
+                let mut line = host;
+                line.push(("no password", String::new()));
+                vec![line]
+            }
+            _ => continue,
+        };
+        urls.logins.push(Login {
+            label: l.label.clone(),
+            lines,
+        });
+    }
+    if urls.web.iter().any(|l| l.label.starts_with("auth")) {
+        urls.logins.push(Login {
+            label: "auth".into(),
+            lines: vec![vec![
+                ("admin", var("KEYCLOAK_ADMIN", "admin")),
+                ("password", var("KEYCLOAK_ADMIN_PASSWORD", "admin")),
+            ]],
+        });
+    }
 }
 
 impl Urls {
@@ -145,7 +209,10 @@ pub fn listening(port: u16) -> bool {
 }
 
 pub fn port_of(url: &str) -> Option<u16> {
-    url.rsplit(':').next()?.trim_end_matches('/').parse().ok()
+    // `postgres://user:pass@localhost:5432/app`: the port is the end of the part before the path.
+    let rest = url.split_once("://").map_or(url, |(_, r)| r);
+    let host = rest.split('/').next()?;
+    host.rsplit(':').next()?.parse().ok()
 }
 
 /// A project's addresses, with whether each web one is answering. Empty when Docker is not
@@ -156,10 +223,30 @@ pub fn read(root: &Path) -> Urls {
     };
     let caddyfile = std::fs::read_to_string(root.join("Caddyfile")).ok();
     let mut urls = links(&config, caddyfile.as_deref());
+    add_logins(&mut urls, &super::envs::dotenv(root));
+    probe(&mut urls);
+    urls
+}
+
+/// Asks each web address again whether something answers: cheap, so it can be done while the
+/// servers start, without reading the compose file again.
+pub fn probe(urls: &mut Urls) {
+    let answering = |url: &str| port_of(url).is_some_and(listening);
+    let plain: Vec<(String, bool)> = urls
+        .web
+        .iter()
+        .map(|l| (l.label.clone(), answering(&l.url)))
+        .collect();
     for l in &mut urls.web {
         l.up = port_of(&l.url).map(listening);
+        // The proxy answers even when the server behind it does not, with a blank 502: a secure
+        // address is only up when its plain one is too.
+        if let Some(behind) = l.label.strip_suffix(" (https)") {
+            let behind_up = plain.iter().any(|(label, up)| label == behind && *up)
+                || (behind == "app" && listening(super::https_dev::VITE_PORT));
+            l.up = l.up.map(|up| up && behind_up);
+        }
     }
-    urls
 }
 
 #[cfg(test)]
@@ -253,9 +340,61 @@ mod tests {
     }
 
     #[test]
+    fn the_databases_say_how_to_sign_in_from_the_env_or_the_defaults() {
+        let login = |urls: &Urls, label: &str| {
+            urls.logins
+                .iter()
+                .find(|l| l.label == label)
+                .cloned()
+                .unwrap()
+        };
+        let mut urls = links(&config(), None);
+        add_logins(
+            &mut urls,
+            &[("POSTGRES_PASSWORD".to_string(), "s3cret".to_string())],
+        );
+        assert_eq!(
+            urls.data[0].url, "postgres://app:s3cret@localhost:5432/app",
+            "the address can be copied whole"
+        );
+        let pg = login(&urls, "postgres");
+        assert_eq!(
+            pg.lines,
+            [
+                vec![
+                    ("host", "localhost".to_string()),
+                    ("port", "5432".to_string())
+                ],
+                vec![
+                    ("user", "app".to_string()),
+                    ("password", "s3cret".to_string()),
+                    ("database", "app".to_string())
+                ]
+            ]
+        );
+        assert_eq!(
+            login(&urls, "redis").lines,
+            [vec![
+                ("host", "localhost".to_string()),
+                ("port", "6379".to_string()),
+                ("no password", String::new())
+            ]]
+        );
+        assert_eq!(
+            login(&urls, "auth").lines,
+            [vec![
+                ("admin", "admin".to_string()),
+                ("password", "admin".to_string())
+            ]]
+        );
+    }
+
+    #[test]
     fn a_port_is_read_back_from_an_address() {
         assert_eq!(port_of("http://localhost:3000"), Some(3000));
         assert_eq!(port_of("https://api.localhost:8443"), Some(8443));
         assert_eq!(port_of("http://localhost"), None);
+        assert_eq!(port_of("postgres://app:pw@localhost:5432/app"), Some(5432));
+        assert_eq!(port_of("http://localhost:8000/health"), Some(8000));
     }
 }

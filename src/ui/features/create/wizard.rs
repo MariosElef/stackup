@@ -64,7 +64,7 @@ impl Wizard {
         let mut libs = self.sel.libs.clone();
         normalize_libs(self.sel.frontend, &mut libs);
         let mut be_libs = self.sel.be_libs.clone();
-        normalize_be_libs(self.sel.backend, &mut be_libs);
+        normalize_be_libs(self.sel.backend, &self.sel.services, &mut be_libs);
         Plan {
             name: self.name.clone(),
             title: self.name.clone(),

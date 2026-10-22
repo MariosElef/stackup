@@ -62,7 +62,8 @@ fn row_line(w: &Wizard, row: &Row) -> Line<'static> {
             if usable { line } else { line.dim() }
         }
         Row::BeLib(l) => {
-            let usable = l.works_with(w.sel.backend);
+            let postgres = w.sel.services.contains(&crate::models::Service::Postgres);
+            let usable = l.why_not(w.sel.backend, postgres).is_none();
             let line = check(usable && w.sel.be_libs.contains(&l), l.to_string());
             if usable { line } else { line.dim() }
         }

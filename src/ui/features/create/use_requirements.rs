@@ -44,6 +44,12 @@ impl Wizard {
         if self.sel.services.contains(&Service::Https) {
             need.push("mkcert");
         }
+        // The migrate, new migration and revert actions run sqlx-cli.
+        if self.sel.backend == Backend::Axum
+            && self.sel.be_libs.contains(&crate::models::BeLib::Sqlx)
+        {
+            need.push("sqlx");
+        }
         need.push("git");
         // The project's repository goes to GitHub: that needs the GitHub CLI, signed in.
         if self.sel.tools.contains(&Tool::Git) {

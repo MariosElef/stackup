@@ -22,6 +22,7 @@ pub fn valid_tier(tier: &str) -> bool {
 
 mod containers;
 mod environment;
+mod migrations;
 mod project;
 mod repo;
 mod ship;
@@ -29,7 +30,7 @@ mod ship;
 mod tests;
 mod volumes;
 
-pub use containers::start;
+pub use containers::{DATABASES_ONLY, start};
 // Checked by the menu's tests too (which run on Unix).
 #[cfg(all(test, unix))]
 pub use project::check_removable;
@@ -51,7 +52,10 @@ pub fn plan(action: Action, p: &Project, facts: &Facts, args: &Args) -> Result<V
         Action::Clean => containers::clean(p),
         Action::Logs => containers::logs(root, args),
         Action::Build => containers::build(root, args),
-        Action::Dev => containers::dev(root, facts)?,
+        Action::Dev => containers::dev(p, facts, args)?,
+        Action::Migrate => migrations::migrate(root, facts)?,
+        Action::MigrationNew => migrations::new(root, facts, args)?,
+        Action::MigrationRevert => migrations::revert(root, facts)?,
         Action::Ci => vec![Step::new("run the CI checks", root, "sh", &["ci.sh"])],
         Action::Fmt => ship::fmt(root, facts)?,
         Action::CargoClean => ship::cargo_clean(p)?,

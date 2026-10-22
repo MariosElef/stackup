@@ -188,3 +188,38 @@ fn backup_volume_offers_the_declared_volumes_and_says_where_each_is_used() {
         "{shown}"
     );
 }
+
+#[test]
+fn dev_asks_in_its_panel_which_part_to_start() {
+    let (mut app, _) = app_with(
+        "devpick",
+        &[("shop", &["backend/Cargo.toml", "frontend/nuxt.config.ts"])],
+    );
+    press(&mut app, KeyCode::Char('p'));
+    press(&mut app, KeyCode::Enter);
+    app.action = app.actions.iter().position(|a| *a == Action::Dev).unwrap();
+    press(&mut app, KeyCode::Enter);
+    let s = screen(&app);
+    assert!(
+        s.contains("What should it start?") && s.contains("both") && s.contains("frontend"),
+        "{s}"
+    );
+    assert!(
+        app.choice.is_none() && app.run.is_none(),
+        "no popup, nothing runs yet"
+    );
+    assert_eq!(app.dev_parts()[0], "fullstack", "both comes first");
+    assert!(
+        !app.dev_parts().contains(&"databases"),
+        "no databases, so no databases-only start"
+    );
+
+    // j moves the pick, not the action list; Esc puts the panel back.
+    let action = app.action;
+    press(&mut app, KeyCode::Char('j'));
+    assert_eq!((app.dev_part, app.action), (Some(1), action));
+    press(&mut app, KeyCode::Esc);
+    assert_eq!(app.dev_part, None);
+    assert_eq!(app.page, Page::Project);
+    assert!(!screen(&app).contains("What should it start?"));
+}

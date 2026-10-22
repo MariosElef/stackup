@@ -150,6 +150,7 @@ impl App {
                 Page::Projects => {
                     " j/k move · <CR> open · n new · a add · d forget · r remove · : commands · h back · ? keymaps"
                 }
+                Page::Project if self.dev_part.is_some() => " j/k pick · <CR> start · esc back",
                 Page::Project => {
                     " j/k move · <CR> run · e env · o open · r remove · : commands · h back · ? keymaps"
                 }

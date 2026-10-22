@@ -3,7 +3,12 @@
 use crate::clients::run::capture;
 use crate::{
     models::{Action, Args, Param},
-    services::projects::{git::Host, plan::plan, registry},
+    services::projects::{
+        git::Host,
+        ide::{Part, parts},
+        plan::{DATABASES_ONLY, plan},
+        registry,
+    },
     ui::{
         features::projects::farewell::Farewell,
         stores::{
@@ -28,11 +33,51 @@ impl App {
         self.begin_action(Action::Remove);
     }
 
-    /// `Enter` on an action: ask for what it needs, then run it.
+    /// `Enter` on an action: ask for what it needs, then run it. `dev` asks in its own panel
+    /// which part to start, when there is more than one.
     pub fn choose_action(&mut self) {
-        if let Some(&action) = self.actions.get(self.action) {
-            self.begin_action(action);
+        let Some(&action) = self.actions.get(self.action) else {
+            return;
+        };
+        if action == Action::Dev && self.dev_parts().len() > 1 {
+            self.dev_part = Some(0);
+            return;
         }
+        self.begin_action(action);
+    }
+
+    /// What `dev` can start, by the name it is given: both together first, and only the
+    /// databases last when the project has some.
+    pub fn dev_parts(&self) -> Vec<&'static str> {
+        let mut out: Vec<&str> = self
+            .facts
+            .as_ref()
+            .map(parts)
+            .unwrap_or_default()
+            .into_iter()
+            .rev()
+            .map(Part::cli)
+            .collect();
+        if !self.urls.data.is_empty() {
+            out.push(DATABASES_ONLY);
+        }
+        out
+    }
+
+    /// Enter in `dev`'s panel: start the part picked.
+    pub(crate) fn start_dev_part(&mut self) {
+        let Some(part) = self
+            .dev_part
+            .take()
+            .and_then(|i| self.dev_parts().get(i).copied())
+        else {
+            return;
+        };
+        let args = Args {
+            part: Some(part.into()),
+            ..Args::default()
+        };
+        self.run_action(Action::Dev, args);
     }
 
     /// git: the real lazygit, run on this same in-app terminal, so nothing of it is rebuilt here.
@@ -70,7 +115,7 @@ impl App {
             Param::VolumeService => return self.open_volume_service_picker(action, args, left),
             Param::VolumePick => return self.open_volume_picker(action, args, left),
             Param::BackupFile => return self.open_backup_picker(action, args, left),
-            Param::Host | Param::VolumeName | Param::MountPath => {}
+            Param::Host | Param::VolumeName | Param::MountPath | Param::MigrationName => {}
         }
         let project = self.project();
         let (label, value) = match param {
@@ -83,6 +128,10 @@ impl App {
                 String::new(),
             ),
             Param::MountPath => ("Path inside the container", "/data".into()),
+            Param::MigrationName => (
+                "What the migration does (add_users, letters digits and _)",
+                String::new(),
+            ),
             // Asked from a list, above.
             Param::Tier
             | Param::Visibility
@@ -128,6 +177,10 @@ impl App {
                 });
             format!(
                 "REMOVE {name} (folder, containers, data{remote}{warning}): type `{name}` to continue"
+            )
+        } else if action == Action::MigrationRevert {
+            format!(
+                "REVERT the last migration of {name} (can drop tables and their data): type `{name}` to continue"
             )
         } else if action == Action::VolumeRestore {
             let (volume, backup) = (
@@ -183,6 +236,7 @@ impl App {
             self.status = format!("{e:#}");
             return;
         }
+        self.dev_part = None;
         self.removing = (action == Action::Remove).then(|| facts.clone());
         self.after = Some((action, args));
         self.run = Some(run);
@@ -205,6 +259,12 @@ impl App {
         }
         self.tick = self.tick.wrapping_add(1);
         self.poll_usage();
+        if matches!(self.page, Page::Project | Page::Run)
+            && self.urls_probed.elapsed() >= std::time::Duration::from_secs(1)
+        {
+            self.urls_probed = std::time::Instant::now();
+            crate::services::projects::urls::probe(&mut self.urls);
+        }
         let size = self.pane.get();
         let Some(run) = &mut self.run else { return };
         run.pump(size);

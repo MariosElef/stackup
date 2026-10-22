@@ -75,6 +75,9 @@ pub fn install_hint(bin: &str) -> &'static str {
             "cargo install --git https://github.com/tokio-rs/topcoat topcoat-cli (needs Rust 1.99+: rustup update)"
         }
         "mkcert" => "install mkcert: https://github.com/FiloSottile/mkcert",
+        "sqlx" => {
+            "cargo install sqlx-cli --no-default-features --features rustls,postgres --locked"
+        }
         "docker" => docker_hint(std::env::consts::OS),
         "git" => "install git",
         "ssh" => "install an SSH client",

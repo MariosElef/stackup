@@ -12,6 +12,8 @@ pub const SERVICE: &str = "caddy-dev";
 pub const CADDYFILE: &str = "Caddyfile.dev";
 /// The proxy's port on this machine: the same as the other one's, so the addresses do not change.
 pub const PORT: u16 = 8443;
+/// Where Vite serves a Vue project while developing.
+pub const VITE_PORT: u16 = 5173;
 
 /// The compose service, indented as a service in the file is.
 pub fn service() -> String {
@@ -23,20 +25,20 @@ pub fn service() -> String {
 /// The Caddyfile for development: the project's own, with the places the servers run in
 /// development in place of the containers they run in otherwise.
 pub fn caddyfile(docker: &str) -> String {
-    docker
-        .replace(
-            "reverse_proxy frontend:3000",
-            "reverse_proxy host.docker.internal:3000",
+    // A server not started yet would otherwise be a blank 502 page; this says which to start.
+    let to = |upstream: &str, part: &str| {
+        format!(
+            "reverse_proxy host.docker.internal:{upstream}\n\thandle_errors 502 {{\n\t\trespond \"The {part} is not running. Start it: stackup start {part}\" 502\n\t}}"
         )
+    };
+    docker
+        .replace("reverse_proxy frontend:3000", &to("3000", "frontend"))
         // The Vue image is served by nginx on 80; its dev server is Vite's.
         .replace(
             "reverse_proxy frontend:80",
-            "reverse_proxy host.docker.internal:5173",
+            &to(&VITE_PORT.to_string(), "frontend"),
         )
-        .replace(
-            "reverse_proxy backend:8000",
-            "reverse_proxy host.docker.internal:8000",
-        )
+        .replace("reverse_proxy backend:8000", &to("8000", "backend"))
 }
 
 /// The compose file with the dev proxy added, or `None` when it has no proxy to copy or already

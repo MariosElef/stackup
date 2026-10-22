@@ -1,0 +1,2 @@
+-- The first migration. Add the tables here, or make the next one with `stackup` > new migration
+-- (`sqlx migrate add -r <name>`). The backend applies what is new each time it starts.

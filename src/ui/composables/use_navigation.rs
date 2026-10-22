@@ -103,6 +103,7 @@ impl App {
         };
         self.env = envs::current(&path);
         self.git = git::read(&path);
+        self.stack = crate::services::projects::stack::read_stack(&path, &facts);
         self.facts = Some(facts);
         self.action = 0;
         true

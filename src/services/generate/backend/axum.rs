@@ -109,13 +109,40 @@ pub(super) fn generate(root: &Path, plan: &Plan) -> Result<()> {
     } else {
         include_str!("../../../../assets/backend/axum/main.rs")
     };
-    fs::write(dir.join("src/main.rs"), main)?;
+    if plan.be_lib(BeLib::Sqlx) {
+        fs::write(dir.join("src/main.rs"), with_migrations(main))?;
+        fs::create_dir_all(dir.join("migrations"))?;
+        for (name, sql) in [
+            (
+                "0001_init.up.sql",
+                include_str!("../../../../assets/backend/axum/migrations/0001_init.up.sql"),
+            ),
+            (
+                "0001_init.down.sql",
+                include_str!("../../../../assets/backend/axum/migrations/0001_init.down.sql"),
+            ),
+        ] {
+            fs::write(dir.join("migrations").join(name), sql)?;
+        }
+        fs::write(
+            dir.join("build.rs"),
+            include_str!("../../../../assets/backend/axum/build.rs"),
+        )?;
+    } else {
+        fs::write(dir.join("src/main.rs"), main)?;
+    }
     keep(&dir.join("src"), crate::models::AXUM_LAYERS)?;
     fs::write(dir.join("rust-toolchain.toml"), plan.rust_toolchain_file())?;
-    fs::write(
-        dir.join("Dockerfile"),
-        include_str!("../../../../assets/backend/axum/Dockerfile").replace("{{BIN}}", &bin),
-    )?;
+    let mut dockerfile =
+        include_str!("../../../../assets/backend/axum/Dockerfile").replace("{{BIN}}", &bin);
+    if plan.be_lib(BeLib::Sqlx) {
+        // The migrations are compiled in, so the build needs them and the script that watches them.
+        dockerfile = dockerfile.replace(
+            "COPY src ./src\n",
+            "COPY src ./src\nCOPY build.rs ./\nCOPY migrations ./migrations\n",
+        );
+    }
+    fs::write(dir.join("Dockerfile"), dockerfile)?;
     fs::write(dir.join(".dockerignore"), "target\n.git\n.env\n")?;
     if plan.tool(Tool::Lint) {
         fs::write(
@@ -128,4 +155,41 @@ pub(super) fn generate(root: &Path, plan: &Plan) -> Result<()> {
         )?;
     }
     Ok(())
+}
+
+/// The starter's `main`, connecting to Postgres and applying the migrations before it serves.
+fn with_migrations(main: &str) -> String {
+    main.replacen(
+        "    let addr = std::env::var(\"BIND_ADDR\")",
+        "    // The database, brought up to date before anything is served: each file in migrations/,
+    // compiled in, is applied once.
+    let database_url = std::env::var(\"DATABASE_URL\")?;
+    let pool = sqlx::PgPool::connect(&database_url).await?;
+    sqlx::migrate!().run(&pool).await?;
+
+    let addr = std::env::var(\"BIND_ADDR\")",
+        1,
+    )
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn with_migrations_the_starter_migrates_before_it_listens() {
+        for main in [
+            include_str!("../../../../assets/backend/axum/main.rs"),
+            include_str!("../../../../assets/backend/axum/main-utoipa.rs"),
+        ] {
+            let out = with_migrations(main);
+            let migrate = out.find("sqlx::migrate!().run(&pool)").expect("migrates");
+            assert!(migrate < out.find("BIND_ADDR").unwrap(), "{out}");
+        }
+        let dockerfile = include_str!("../../../../assets/backend/axum/Dockerfile");
+        assert!(
+            dockerfile.contains("COPY src ./src\n"),
+            "the anchor the migrations go after"
+        );
+    }
 }

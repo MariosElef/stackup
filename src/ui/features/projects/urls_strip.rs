@@ -12,10 +12,10 @@ use super::{
 };
 use crate::{
     models::{Backend, Facts, Frontend},
-    services::projects::urls::Link,
+    services::projects::urls::{Link, Login},
     ui::{
         stores::app::App,
-        theme::{CYAN, GREEN, pane_border},
+        theme::{CYAN, GREEN, YELLOW, pane_border},
     },
 };
 
@@ -37,14 +37,20 @@ fn logos_for(app: &App, width: u16) -> Option<Facts> {
 
 /// A panel and what it needs: its title, and how many rows of content.
 enum Panel {
-    Links(&'static str, Vec<Link>, bool),
+    /// A title, the addresses, whether they open in a browser, and how to sign in to them.
+    Links(&'static str, Vec<Link>, bool, Vec<Login>),
     Logos(Facts),
 }
 
 impl Panel {
     fn rows(&self) -> usize {
         match self {
-            Panel::Links(_, links, _) => links.len(),
+            Panel::Links(_, links, _, logins) => {
+                links.len()
+                    + signed_in(links, logins)
+                        .map(|g| g.lines.len())
+                        .sum::<usize>()
+            }
             Panel::Logos(_) => usize::from(stack_banner::SMALL_HEIGHT),
         }
     }
@@ -52,10 +58,14 @@ impl Panel {
     /// Columns the content wants, with its borders.
     fn width(&self) -> u16 {
         match self {
-            Panel::Links(_, links, _) => {
+            Panel::Links(_, links, _, logins) => {
                 let label = links.iter().map(|l| l.label.len()).max().unwrap_or(0);
                 let address = links.iter().map(|l| l.url.len()).max().unwrap_or(0);
-                (label + address + 14) as u16
+                let login = signed_in(links, logins)
+                    .map(|l| login_width(l) + label + 6)
+                    .max()
+                    .unwrap_or(0);
+                (label + address + 14).max(login) as u16
             }
             Panel::Logos(facts) => stack_banner::small_width(facts) + 2,
         }
@@ -70,10 +80,20 @@ fn panels(app: &App, width: u16) -> Vec<Panel> {
     }
     let mut out = vec![];
     if !urls.web.is_empty() {
-        out.push(Panel::Links("open in a browser", urls.web.clone(), true));
+        out.push(Panel::Links(
+            "open in a browser",
+            urls.web.clone(),
+            true,
+            urls.logins.clone(),
+        ));
     }
     if !urls.data.is_empty() {
-        out.push(Panel::Links("connect to", urls.data.clone(), false));
+        out.push(Panel::Links(
+            "connect to",
+            urls.data.clone(),
+            false,
+            urls.logins.clone(),
+        ));
     }
     if let Some(facts) = logos_for(app, width) {
         out.push(Panel::Logos(facts));
@@ -87,19 +107,58 @@ pub fn height(app: &App, width: u16) -> u16 {
     let panels = panels(app, width);
     let rows = |p: &Panel| p.rows() as u16 + 2;
     if width >= SIDE_BY_SIDE {
-        panels.iter().map(rows).max().unwrap_or(0).min(12)
+        panels.iter().map(rows).max().unwrap_or(0).min(14)
     } else {
-        panels.iter().map(rows).sum::<u16>().min(16)
+        panels.iter().map(rows).sum::<u16>().min(20)
     }
 }
 
-/// A line per address: a dot for whether something answers, what it is, where, and the word.
-fn rows(links: &[Link], web: bool) -> Vec<Line<'static>> {
+/// The sign-ins that belong to these addresses.
+fn signed_in<'a>(links: &'a [Link], logins: &'a [Login]) -> impl Iterator<Item = &'a Login> {
+    logins
+        .iter()
+        .filter(|g| links.iter().any(|l| l.label == g.label))
+}
+
+/// The widest of a sign-in's lines.
+fn login_width(login: &Login) -> usize {
+    login
+        .lines
+        .iter()
+        .map(|line| line.iter().map(|(k, v)| k.len() + v.len() + 3).sum())
+        .max()
+        .unwrap_or(0)
+}
+
+/// A sign-in under its address, lined up with the address: `host localhost  port 5432`, then
+/// `user app  password change-me  database app`.
+fn login_lines(login: &Login, indent: usize) -> Vec<Line<'static>> {
+    login
+        .lines
+        .iter()
+        .map(|fields| {
+            let mut spans = vec![Span::raw(" ".repeat(indent))];
+            for (key, value) in fields {
+                if value.is_empty() {
+                    spans.push(Span::styled(format!("{key}  "), Style::new().fg(GRAY)));
+                } else {
+                    spans.push(Span::styled(format!("{key} "), Style::new().fg(GRAY)));
+                    spans.push(Span::styled(format!("{value}  "), Style::new().fg(YELLOW)));
+                }
+            }
+            Line::from(spans)
+        })
+        .collect()
+}
+
+/// A line per address: a dot for whether something answers, what it is, where, and the word;
+/// under one that asks for a sign-in, what to sign in with.
+fn rows(links: &[Link], web: bool, logins: &[Login]) -> Vec<Line<'static>> {
     let label = links.iter().map(|l| l.label.len()).max().unwrap_or(0);
     let address = links.iter().map(|l| l.url.len()).max().unwrap_or(0);
     links
         .iter()
-        .map(|l| {
+        .flat_map(|l| {
             let (dot, word, color) = match l.up {
                 Some(true) => ("●", "up", GREEN),
                 Some(false) => ("○", "down", GRAY),
@@ -110,7 +169,7 @@ fn rows(links: &[Link], web: bool) -> Vec<Line<'static>> {
             } else {
                 Style::new()
             };
-            Line::from(vec![
+            let line = Line::from(vec![
                 Span::styled(format!("  {dot} "), Style::new().fg(color)),
                 Span::styled(
                     format!("{:<label$}  ", l.label),
@@ -118,7 +177,13 @@ fn rows(links: &[Link], web: bool) -> Vec<Line<'static>> {
                 ),
                 Span::styled(format!("{:<address$}", l.url), url),
                 Span::styled(format!("  {word}"), Style::new().fg(color)),
-            ])
+            ]);
+            let login = logins
+                .iter()
+                .find(|g| g.label == l.label)
+                .map(|g| login_lines(g, label + 6))
+                .unwrap_or_default();
+            std::iter::once(line).chain(login)
         })
         .collect()
 }
@@ -138,7 +203,9 @@ fn draw(f: &mut Frame, area: Rect, panel: &Panel, tick: u64) {
     let inner = block.inner(area);
     f.render_widget(block, area);
     match panel {
-        Panel::Links(_, links, web) => f.render_widget(Paragraph::new(rows(links, *web)), inner),
+        Panel::Links(_, links, web, logins) => {
+            f.render_widget(Paragraph::new(rows(links, *web, logins)), inner)
+        }
         Panel::Logos(facts) => stack_banner::render_small(f, inner, facts, tick),
     }
 }
@@ -200,11 +267,37 @@ mod tests {
         app.urls = Urls {
             web: vec![link("app", Some(true)), link("api", Some(false))],
             data: vec![link("postgres", None)],
+            logins: vec![],
         };
         // No project open, so no logos. Side by side: the taller list and the borders; too narrow
         // for that: each panel under the other.
         assert_eq!(height(&app, 120), 2 + 2);
         assert_eq!(height(&app, 50), (2 + 2) + (1 + 2));
+    }
+
+    #[test]
+    fn a_database_shows_what_to_sign_in_with_under_its_address() {
+        let login = Login {
+            label: "postgres".into(),
+            lines: vec![
+                vec![("host", "localhost".into()), ("port", "5432".into())],
+                vec![("user", "app".into()), ("password", "s3cret".into())],
+            ],
+        };
+        let lines = rows(
+            &[link("postgres", None), link("redis", None)],
+            false,
+            &[login],
+        );
+        let text: Vec<String> = lines
+            .iter()
+            .map(|l| l.spans.iter().map(|s| s.content.as_ref()).collect())
+            .collect();
+        assert_eq!(text.len(), 4, "{text:?}");
+        assert!(text[0].contains("postgres"));
+        assert!(text[1].contains("host localhost") && text[1].contains("port 5432"));
+        assert!(text[2].contains("user app") && text[2].contains("password s3cret"));
+        assert!(text[3].contains("redis"));
     }
 
     #[test]
@@ -215,7 +308,11 @@ mod tests {
                 .map(|s| s.content.as_ref())
                 .collect::<String>()
         };
-        let lines = rows(&[link("app", Some(true)), link("api", Some(false))], true);
+        let lines = rows(
+            &[link("app", Some(true)), link("api", Some(false))],
+            true,
+            &[],
+        );
         assert!(text(&lines[0]).contains('●') && text(&lines[0]).ends_with("up"));
         assert!(text(&lines[1]).contains('○') && text(&lines[1]).ends_with("down"));
     }

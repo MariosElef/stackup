@@ -15,5 +15,6 @@ pub mod overview;
 pub mod plan;
 pub mod registry;
 pub mod resolve;
+pub mod stack;
 pub mod urls;
 pub mod volumes;

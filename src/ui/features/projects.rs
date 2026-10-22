@@ -8,5 +8,6 @@ pub mod project_list;
 pub mod project_page;
 pub mod project_panels;
 pub mod stack_banner;
+pub mod stack_panel;
 pub mod tier_modal;
 pub mod urls_strip;
