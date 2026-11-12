@@ -32,6 +32,11 @@ irm https://raw.githubusercontent.com/MariosElef/stackup/main/install.ps1 | iex
 cargo install --git https://github.com/MariosElef/stackup
 ```
 
+On Windows you can also download `stackup-<version>-windows-x64-setup.exe` from
+[Releases](https://github.com/MariosElef/stackup/releases) and double-click it: it installs for your
+user only (no administrator), puts `stackup` on your PATH, and adds it to the Start menu. Ready-made
+archives for macOS (Intel and Apple Silicon), Linux (x64 and ARM) and Windows are there too.
+
 ## Use
 
 ```sh
