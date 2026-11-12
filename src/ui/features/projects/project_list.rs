@@ -1,24 +1,24 @@
 use ratatui::{
     Frame,
     layout::Rect,
-    style::{Modifier, Style},
+    style::Style,
     text::{Line, Span},
-    widgets::{Block, List, ListItem, ListState, Paragraph},
+    widgets::{List, ListItem, ListState, Padding, Paragraph},
 };
 
 use crate::{
     models::Facts,
     ui::{
         stores::app::App,
-        theme::{GREEN, RED, pane_border},
+        theme::{CYAN, GRAY, RED, pane, pane_title, selected},
     },
 };
 
 /// The projects built with stackup, with what each is made of.
 pub fn render(f: &mut Frame, area: Rect, app: &App) {
-    let block = Block::bordered()
-        .border_style(pane_border(true))
-        .title(" my projects ");
+    let block = pane(true)
+        .title(pane_title("my projects"))
+        .padding(Padding::new(1, 1, 1, 0));
     if app.projects.is_empty() {
         let text = Paragraph::new(vec![
             Line::from(""),
@@ -34,22 +34,23 @@ pub fn render(f: &mut Frame, area: Rect, app: &App) {
     let items: Vec<ListItem> = app
         .projects
         .iter()
-        .map(|p| {
+        .enumerate()
+        .map(|(i, p)| {
             let facts = Facts::read(&p.path);
             let what = if facts.exists {
-                Span::styled(facts.summary(), Style::new().dim())
+                Span::styled(facts.summary(), Style::new().fg(GRAY))
             } else {
                 Span::styled("missing", Style::new().fg(RED))
             };
+            let icon = if i == app.cursor { CYAN } else { GRAY };
             ListItem::new(Line::from(vec![
-                Span::styled(format!("{:<16}", p.name), Style::new().fg(GREEN).bold()),
+                Span::styled(" \u{f07b}  ", Style::new().fg(icon)),
+                Span::styled(format!("{:<18}", p.name), Style::new().bold()),
                 what,
             ]))
         })
         .collect();
-    let list = List::new(items)
-        .block(block)
-        .highlight_style(Style::new().add_modifier(Modifier::REVERSED));
+    let list = List::new(items).block(block).highlight_style(selected());
     let mut state = ListState::default().with_selected(Some(app.cursor));
     f.render_stateful_widget(list, area, &mut state);
 }

@@ -3,19 +3,17 @@ use ratatui::{
     layout::Rect,
     style::Style,
     text::{Line, Span},
-    widgets::{Block, Paragraph, Wrap},
+    widgets::{Paragraph, Wrap},
 };
 
 use crate::ui::{
     stores::app::App,
-    theme::{CYAN, pane_border},
+    theme::{CYAN, SELECTED_BG, pane, pane_title},
 };
 
 /// What the selected action does, and what it will ask for.
 pub fn render(f: &mut Frame, area: Rect, app: &App) {
-    let block = Block::bordered()
-        .border_style(pane_border(false))
-        .title(" what it does ");
+    let block = pane(false).title(pane_title("what it does"));
     let Some(action) = app.actions.get(app.action) else {
         let text = if app.facts.as_ref().is_some_and(|f| !f.exists) {
             " This project's folder is missing."
@@ -48,15 +46,18 @@ pub fn render(f: &mut Frame, area: Rect, app: &App) {
                 _ => ("databases", "only the databases in Docker, no server"),
             };
             let picked = i == row;
-            let style = if picked {
-                Style::new().fg(CYAN).bold()
+            let (bar, row) = if picked {
+                (Style::new().fg(CYAN), Style::new().bg(SELECTED_BG))
             } else {
-                Style::new()
+                (Style::new(), Style::new())
             };
             lines.push(Line::from(vec![
-                Span::styled(if picked { " ▶ " } else { "   " }, style),
-                Span::styled(format!("{label:<10}"), style),
-                Span::styled(note, Style::new().dim()),
+                Span::styled(if picked { " ▌" } else { "  " }, bar),
+                Span::styled(
+                    format!(" {label:<10}"),
+                    if picked { row.bold() } else { row },
+                ),
+                Span::styled(format!("{note} "), row.dim()),
             ]));
         }
     } else if !action.params().is_empty() {

@@ -3,7 +3,7 @@ use ratatui::{
     layout::Rect,
     style::Style,
     text::Line,
-    widgets::{Block, Clear, Paragraph, Wrap},
+    widgets::{Block, BorderType, Clear, Paragraph, Wrap},
 };
 
 /// How tall `lines` are once they wrap at `width`.
@@ -38,6 +38,7 @@ pub fn render(
     f.render_widget(
         Paragraph::new(lines).wrap(Wrap { trim: false }).block(
             Block::bordered()
+                .border_type(BorderType::Rounded)
                 .border_style(border)
                 .title(format!(" {title} "))
                 .title_bottom(format!(" {keys} ")),

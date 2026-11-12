@@ -3,7 +3,7 @@ use ratatui::{
     layout::Rect,
     style::{Color, Modifier, Style},
     text::{Line, Span},
-    widgets::{Block, Paragraph, Wrap},
+    widgets::{Paragraph, Wrap},
 };
 
 use crate::{
@@ -15,27 +15,31 @@ use crate::{
     },
     ui::{
         stores::app::App,
-        theme::{BLUE, CYAN, GREEN, INK, PINK, RED, YELLOW, pane_border, tier_color},
+        theme::{BLUE, CYAN, GREEN, PINK, RED, RULE, YELLOW, pane, pane_title, tier_color},
     },
 };
 
 pub(super) const GRAY: Color = Color::Indexed(244);
 
-/// A word on a colored background, like a badge.
-pub(super) fn pill(text: &str, color: Color) -> Span<'static> {
-    Span::styled(
-        format!(" {text} "),
-        Style::new().fg(INK).bg(color).add_modifier(Modifier::BOLD),
-    )
+/// A name in its own color, bold: how a technology or an environment stands out.
+pub(super) fn tag(text: &str, color: Color) -> Span<'static> {
+    Span::styled(text.to_string(), Style::new().fg(color).bold())
 }
 
-/// A badge that is on, in color, or off, dim.
-pub(super) fn flag(text: &str, on: bool) -> Span<'static> {
-    if on {
-        pill(&format!("{text} ✓"), GREEN)
-    } else {
-        Span::styled(format!(" {text} ✗ "), Style::new().fg(GRAY))
-    }
+/// A feature with a mark for whether the project has it: a green tick, or a dim cross.
+pub(super) fn flag(text: &str, on: bool) -> Vec<Span<'static>> {
+    let (mark, color) = if on { ("✓", GREEN) } else { ("✗", GRAY) };
+    vec![
+        Span::styled(format!("{mark} "), Style::new().fg(color)),
+        Span::styled(
+            text.to_string(),
+            if on {
+                Style::new()
+            } else {
+                Style::new().fg(GRAY)
+            },
+        ),
+    ]
 }
 
 /// The color a technology is known by, so a stack reads at a glance.
@@ -68,14 +72,14 @@ pub(super) fn tilde(path: &std::path::Path) -> String {
     }
 }
 
+/// A section of the card, named the way the sidebar names its sections.
 pub(super) fn heading(text: &str) -> Line<'static> {
-    Line::from(vec![
-        Span::styled(" ▍", Style::new().fg(BLUE)),
-        Span::styled(
-            text.to_uppercase(),
-            Style::new().fg(BLUE).add_modifier(Modifier::BOLD),
-        ),
-    ])
+    Line::from(Span::styled(
+        format!(" {text}"),
+        Style::new()
+            .fg(CYAN)
+            .add_modifier(Modifier::BOLD | Modifier::DIM),
+    ))
 }
 
 pub(super) fn label(text: &str) -> Span<'static> {
@@ -158,9 +162,9 @@ fn card(app: &App) -> Option<Card> {
             .chain(stack.backend.iter().take(1))
         {
             if !built.is_empty() {
-                built.push(Span::raw("  "));
+                built.push(Span::styled("  ·  ", Style::new().fg(RULE)));
             }
-            built.push(pill(name, tech_color(name)));
+            built.push(tag(name, tech_color(name)));
         }
         if built.is_empty() {
             built.push(Span::styled("none", Style::new().fg(GRAY)));
@@ -169,13 +173,14 @@ fn card(app: &App) -> Option<Card> {
         lines.push(row("built with", built));
         lines.push(row(
             "features",
-            vec![
+            [
                 flag("https", facts.https),
-                Span::raw(" "),
+                vec![Span::raw("   ")],
                 flag("ci", facts.ci),
-                Span::raw(" "),
+                vec![Span::raw("   ")],
                 flag("hooks", facts.hooks),
-            ],
+            ]
+            .concat(),
         ));
         lines.push(Line::from(""));
         lines.push(heading("Environment"));
@@ -187,7 +192,7 @@ fn card(app: &App) -> Option<Card> {
         lines.push(row(
             "active",
             vec![match &env {
-                Some(t) => pill(t, tier_color(t)),
+                Some(t) => tag(&format!("● {t}"), tier_color(t)),
                 None => Span::styled("none yet", Style::new().fg(GRAY)),
             }],
         ));
@@ -227,14 +232,9 @@ pub fn height(app: &App, width: u16) -> u16 {
 /// What the selected project is: its state, its stack, and where it deploys.
 pub fn render(f: &mut Frame, area: Rect, app: &App) {
     let Some(card) = card(app) else {
-        return f.render_widget(
-            Block::bordered()
-                .border_style(pane_border(false))
-                .title(" about "),
-            area,
-        );
+        return f.render_widget(pane(false).title(pane_title("about")), area);
     };
-    let block = Block::bordered()
+    let block = pane(false)
         .border_style(Style::new().fg(card.border))
         .title(Line::from(vec![
             Span::raw(" "),

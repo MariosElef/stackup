@@ -162,7 +162,8 @@ impl App {
                     | Param::RemoveFrom
                     | Param::VolumeService
                     | Param::VolumePick
-                    | Param::BackupFile => {}
+                    | Param::BackupFile
+                    | Param::Database => {}
                 }
                 self.ask_next(action, args, left);
             }

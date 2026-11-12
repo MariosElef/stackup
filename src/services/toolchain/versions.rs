@@ -35,6 +35,8 @@ pub enum Question {
     Volume,
     /// Which saved backup.
     Backup,
+    /// Which database to query.
+    Database,
 }
 
 impl Question {
@@ -54,6 +56,7 @@ impl Question {
             Question::VolumeService => "Which service stores it?",
             Question::Volume => "Which volume?",
             Question::Backup => "Which backup?",
+            Question::Database => "Which database?",
         }
     }
 
@@ -85,6 +88,9 @@ impl Question {
                 "The service whose container gets the storage: what it writes at the path you give next is kept.".into()
             }
             Question::Volume => "The named volumes the compose file declares.".into(),
+            Question::Database => {
+                "Its shell opens here, signed in. Quit it and you are back.".into()
+            }
             Question::Backup => "From the project's backups/ folder, the newest first. Restoring replaces what is in the volume.".into(),
             Question::RemoveFrom => {
                 "Deleting the repository on GitHub or GitLab cannot be undone: its history and issues go too."
@@ -158,7 +164,8 @@ impl Picks {
             | Question::RemoveFrom
             | Question::VolumeService
             | Question::Volume
-            | Question::Backup => {}
+            | Question::Backup
+            | Question::Database => {}
         }
     }
 }
@@ -263,7 +270,8 @@ pub fn options(question: Question, m: &dyn Machine) -> Vec<Choice> {
         | Question::RemoveFrom
         | Question::VolumeService
         | Question::Volume
-        | Question::Backup => vec![],
+        | Question::Backup
+        | Question::Database => vec![],
         Question::Visibility => vec![
             choice(
                 "private",

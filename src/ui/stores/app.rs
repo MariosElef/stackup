@@ -22,6 +22,15 @@ use crate::{
     ui::types::Page,
 };
 
+/// `up` or `dev` left running with `d`: it goes on in the background, and choosing the action
+/// again in the same project shows it.
+pub struct Detached {
+    pub path: PathBuf,
+    pub action: Action,
+    pub args: Args,
+    pub run: Run,
+}
+
 /// What typing in the footer is for.
 pub enum PromptKind {
     /// The name of a new project.
@@ -203,6 +212,8 @@ pub struct App {
     pub prompt: Option<Prompt>,
     pub status: String,
     pub run: Option<Run>,
+    /// Runs left going in the background.
+    pub detached: Vec<Detached>,
     /// The program that makes a project: stackup itself, run on the in-app terminal.
     pub exe: PathBuf,
     /// The name of the project being made, while it is.
@@ -294,6 +305,7 @@ impl App {
             prompt: None,
             status: String::new(),
             run: None,
+            detached: vec![],
             after: None,
             removed: false,
             celebration: None,

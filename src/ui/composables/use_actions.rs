@@ -13,7 +13,7 @@ use crate::{
         components::celebration::Celebration,
         features::projects::farewell::Farewell,
         stores::{
-            app::{App, Prompt, PromptKind, Then},
+            app::{App, Detached, Prompt, PromptKind, Then},
             run::Run,
         },
         types::Page,
@@ -40,11 +40,88 @@ impl App {
         let Some(&action) = self.actions.get(self.action) else {
             return;
         };
+        if self.reattach(action) {
+            return;
+        }
         if action == Action::Dev && self.dev_parts().len() > 1 {
             self.dev_part = Some(0);
             return;
         }
         self.begin_action(action);
+    }
+
+    /// Whether `d` would detach what is on screen: `up` or `dev`, still running.
+    pub(crate) fn detachable(&self) -> bool {
+        self.page == Page::Run
+            && matches!(self.after, Some((Action::Up | Action::Dev, _)))
+            && self.run.as_ref().is_some_and(Run::live)
+    }
+
+    /// `d` while `up` or `dev` runs: it goes on in the background, and the project is back.
+    pub(crate) fn detach(&mut self) {
+        let Some(path) = self.project().map(|p| p.path.clone()) else {
+            return;
+        };
+        let (Some(run), Some((action, args))) = (self.run.take(), self.after.take()) else {
+            return;
+        };
+        self.detached.push(Detached {
+            path,
+            action,
+            args,
+            run,
+        });
+        self.refresh_project_state();
+        self.page = Page::Project;
+        self.status = format!(
+            "{} keeps running in the background: choose it again to see it",
+            action.name()
+        );
+    }
+
+    /// Whether `action` runs in the background for the open project.
+    pub fn is_detached(&self, action: Action) -> bool {
+        self.project().is_some_and(|p| {
+            self.detached
+                .iter()
+                .any(|d| d.path == p.path && d.action == action)
+        })
+    }
+
+    /// Shows `action`'s background run again, if the open project has one.
+    fn reattach(&mut self, action: Action) -> bool {
+        let Some(path) = self.project().map(|p| p.path.clone()) else {
+            return false;
+        };
+        let Some(i) = self
+            .detached
+            .iter()
+            .position(|d| d.path == path && d.action == action)
+        else {
+            return false;
+        };
+        let d = self.detached.remove(i);
+        self.run = Some(d.run);
+        self.after = Some((d.action, d.args));
+        self.diagnosed = false;
+        self.page = Page::Run;
+        self.status.clear();
+        true
+    }
+
+    /// Keeps the background runs going, and says when one of them ends.
+    fn pump_detached(&mut self, size: (u16, u16)) {
+        for d in &mut self.detached {
+            d.run.pump(size);
+        }
+        while let Some(i) = self.detached.iter().position(|d| !d.run.live()) {
+            let d = self.detached.remove(i);
+            self.status = format!(
+                "{} in the background: {}",
+                d.action.name(),
+                d.run.ended.as_deref().unwrap_or("ended")
+            );
+        }
     }
 
     /// What `dev` can start, by the name it is given: both together first, and only the
@@ -96,6 +173,9 @@ impl App {
 
     /// Starts an action: asks for what it needs, then runs it.
     pub fn begin_action(&mut self, action: Action) {
+        if self.reattach(action) {
+            return;
+        }
         if action == Action::GitOpen {
             return self.open_lazygit();
         }
@@ -116,6 +196,7 @@ impl App {
             Param::VolumeService => return self.open_volume_service_picker(action, args, left),
             Param::VolumePick => return self.open_volume_picker(action, args, left),
             Param::BackupFile => return self.open_backup_picker(action, args, left),
+            Param::Database => return self.open_database_picker(action, args, left),
             Param::Host | Param::VolumeName | Param::MountPath | Param::MigrationName => {}
         }
         let project = self.project();
@@ -139,7 +220,8 @@ impl App {
             | Param::RemoveFrom
             | Param::VolumeService
             | Param::VolumePick
-            | Param::BackupFile => {
+            | Param::BackupFile
+            | Param::Database => {
                 unreachable!("picked, not typed")
             }
         };
@@ -297,6 +379,7 @@ impl App {
             crate::services::projects::urls::probe(&mut self.urls);
         }
         let size = self.pane.get();
+        self.pump_detached(size);
         let Some(run) = &mut self.run else { return };
         run.pump(size);
         let failed = run
@@ -339,8 +422,8 @@ impl App {
                     facts.as_ref(),
                 ));
             }
-            // lazygit was quit: straight back to the project, with git read again.
-            Some((Action::GitOpen, _)) => self.back(),
+            // lazygit or a database shell was quit: straight back to the project.
+            Some((Action::GitOpen | Action::Query, _)) => self.back(),
             _ => {}
         }
     }

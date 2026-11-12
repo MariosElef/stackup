@@ -1,14 +1,14 @@
 use ratatui::{
     Frame,
     layout::Rect,
-    style::{Modifier, Style},
+    style::{Color, Style},
     text::{Line, Span},
-    widgets::{Block, Clear, Paragraph},
+    widgets::{Clear, Paragraph},
 };
 
 use crate::ui::{
     stores::app::Palette,
-    theme::{CYAN, GREEN, YELLOW},
+    theme::{self, CYAN, YELLOW, pane},
 };
 
 /// How many entries are shown at once.
@@ -41,10 +41,7 @@ pub fn render(f: &mut Frame, screen: Rect, palette: &Palette) {
         let selected = i == palette.selected;
         let label = format!(" {:<34}", e.label);
         let style = if selected {
-            Style::new()
-                .fg(GREEN)
-                .bold()
-                .add_modifier(Modifier::REVERSED)
+            theme::selected().fg(Color::White)
         } else {
             Style::new()
         };
@@ -56,8 +53,8 @@ pub fn render(f: &mut Frame, screen: Rect, palette: &Palette) {
     f.render_widget(Clear, area);
     f.render_widget(
         Paragraph::new(lines).block(
-            Block::bordered()
-                .border_style(Style::new().fg(YELLOW).bold())
+            pane(false)
+                .border_style(Style::new().fg(YELLOW))
                 .title(" commands ")
                 .title_bottom(format!(" {} ", shown.len())),
         ),

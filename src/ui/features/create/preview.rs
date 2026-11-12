@@ -1,9 +1,9 @@
 use ratatui::{
     Frame,
     layout::Rect,
-    style::{Modifier, Style},
+    style::Style,
     text::{Line, Span},
-    widgets::{Block, Paragraph},
+    widgets::Paragraph,
 };
 
 use super::file_tree;
@@ -11,7 +11,7 @@ use crate::{
     services::generate::compose::compose,
     ui::{
         features::create::wizard::Wizard,
-        theme::pane_border,
+        theme::{CYAN, GRAY, pane, selected},
         types::{Focus, Tab},
     },
 };
@@ -20,12 +20,9 @@ pub fn render(f: &mut Frame, area: Rect, w: &Wizard) {
     let plan = w.plan();
     let tab = |label: &'static str, active: bool| {
         if active {
-            Span::styled(
-                format!(" {label} "),
-                Style::new().add_modifier(Modifier::REVERSED),
-            )
+            Span::styled(format!(" {label} "), selected().fg(CYAN))
         } else {
-            Span::styled(format!(" {label} "), Style::new().dim())
+            Span::styled(format!(" {label} "), Style::new().fg(GRAY))
         }
     };
     let title = Line::from(vec![
@@ -43,10 +40,8 @@ pub fn render(f: &mut Frame, area: Rect, w: &Wizard) {
     let inner = area.height.saturating_sub(2) as usize;
     let max = lines.len().saturating_sub(inner) as u16;
     w.max_scroll.set(max);
-    let p = Paragraph::new(lines).scroll((w.scroll.min(max), 0)).block(
-        Block::bordered()
-            .border_style(pane_border(w.focus == Focus::Preview))
-            .title(title),
-    );
+    let p = Paragraph::new(lines)
+        .scroll((w.scroll.min(max), 0))
+        .block(pane(w.focus == Focus::Preview).title(title));
     f.render_widget(p, area);
 }

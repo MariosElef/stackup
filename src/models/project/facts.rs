@@ -32,6 +32,8 @@ pub struct Facts {
     pub has_volumes: bool,
     /// The backend keeps migrations in `backend/migrations`: sqlx's or Alembic's.
     pub migrations: bool,
+    /// The compose file runs Postgres, MongoDB or Redis: something to query.
+    pub databases: bool,
 }
 
 impl Facts {
@@ -65,6 +67,11 @@ impl Facts {
                 .is_ok_and(|c| c.contains("[remote \"origin\"]")),
             // A top-level `volumes:` is where a compose file declares its named volumes.
             migrations: has("backend/migrations"),
+            // A service is declared two spaces in, under `services:`.
+            databases: std::fs::read_to_string(root.join("docker-compose.yml")).is_ok_and(|t| {
+                t.lines()
+                    .any(|l| matches!(l.trim_end(), "  postgres:" | "  mongo:" | "  redis:"))
+            }),
             has_volumes: std::fs::read_to_string(root.join("docker-compose.yml"))
                 .is_ok_and(|t| t.lines().any(|l| l.trim_end() == "volumes:")),
             // A workspace has one `target/` at the root; separate crates have their own.

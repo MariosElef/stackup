@@ -8,7 +8,7 @@ use ratatui::{
     layout::Rect,
     style::{Color, Style},
     text::{Line, Span},
-    widgets::{Block, Clear, Paragraph},
+    widgets::{Clear, Paragraph},
 };
 
 use crate::ui::theme::{CYAN, GREEN, YELLOW};
@@ -130,7 +130,7 @@ pub fn render(f: &mut Frame, area: Rect, c: &Celebration) {
         height,
     };
     f.render_widget(Clear, rect);
-    let block = Block::bordered().border_style(Style::new().fg(GREEN));
+    let block = crate::ui::theme::pane(false).border_style(Style::new().fg(GREEN));
     let inner = block.inner(rect);
     f.render_widget(block, rect);
     let t = c.progress();

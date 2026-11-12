@@ -150,6 +150,14 @@ pub fn declared(text: &str) -> Vec<String> {
         .collect()
 }
 
+/// The databases the file runs, by their service names: `postgres`, `mongo`, `redis`.
+pub fn databases(text: &str) -> Vec<String> {
+    services(text)
+        .into_iter()
+        .filter(|s| matches!(s.as_str(), "postgres" | "mongo" | "redis"))
+        .collect()
+}
+
 /// The services in the file.
 pub fn services(text: &str) -> Vec<String> {
     let lines: Vec<&str> = text.lines().collect();

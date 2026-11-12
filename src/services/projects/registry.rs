@@ -165,8 +165,9 @@ mod tests {
         }
         let home = root.join("home");
         // Listed earlier under another name, with a host.
-        add(&home, "shop", &shop.canonicalize().unwrap()).unwrap();
-        set_host(&home, &shop.canonicalize().unwrap(), "ops@example.com").unwrap();
+        let shop_path = crate::clients::os::canonical(&shop).unwrap();
+        add(&home, "shop", &shop_path).unwrap();
+        set_host(&home, &shop_path, "ops@example.com").unwrap();
 
         let result = add_found(&home, &root.join("work")).unwrap();
         assert_eq!(result.added, ["blog"]);

@@ -117,10 +117,36 @@ fn caddy_hosts(caddyfile: &str) -> Vec<String> {
     caddyfile
         .lines()
         .filter_map(|l| l.trim().strip_prefix("https://"))
-        .filter_map(|rest| rest.split([' ', '{']).next())
-        .filter(|h| !h.is_empty())
+        .filter_map(|rest| rest.split([' ', '{', ',']).next())
+        // `www.` only sends visitors on to the bare name: not a page of its own.
+        .filter(|h| !h.is_empty() && !h.ends_with('.') && !h.starts_with("www."))
         .map(str::to_string)
         .collect()
+}
+
+/// `caddyfile` with its environment placeholders filled in as Caddy fills them: `{$NAME}`
+/// from `env`, `{$NAME:default}` from `env` or else the default, and a name `env` lacks
+/// with no default as nothing.
+pub fn with_env(caddyfile: &str, env: &[(String, String)]) -> String {
+    let mut out = String::with_capacity(caddyfile.len());
+    let mut rest = caddyfile;
+    while let Some(start) = rest.find("{$") {
+        out.push_str(&rest[..start]);
+        let Some(end) = rest[start..].find('}') else {
+            out.push_str(&rest[start..]);
+            return out;
+        };
+        let inner = &rest[start + 2..start + end];
+        let (name, default) = inner.split_once(':').unwrap_or((inner, ""));
+        let value = env
+            .iter()
+            .find(|(key, value)| key == name && !value.is_empty())
+            .map_or(default, |(_, value)| value.as_str());
+        out.push_str(value);
+        rest = &rest[start + end + 1..];
+    }
+    out.push_str(rest);
+    out
 }
 
 /// The host side and container side of each port a service publishes.
@@ -221,9 +247,12 @@ pub fn read(root: &Path) -> Urls {
     let Ok(config) = docker::config(root) else {
         return Urls::default();
     };
-    let caddyfile = std::fs::read_to_string(root.join("Caddyfile")).ok();
+    let env = super::envs::dotenv(root);
+    let caddyfile = std::fs::read_to_string(root.join("Caddyfile"))
+        .ok()
+        .map(|caddyfile| with_env(&caddyfile, &env));
     let mut urls = links(&config, caddyfile.as_deref());
-    add_logins(&mut urls, &super::envs::dotenv(root));
+    add_logins(&mut urls, &env);
     probe(&mut urls);
     urls
 }
@@ -396,5 +425,29 @@ mod tests {
         assert_eq!(port_of("http://localhost"), None);
         assert_eq!(port_of("postgres://app:pw@localhost:5432/app"), Some(5432));
         assert_eq!(port_of("http://localhost:8000/health"), Some(8000));
+    }
+
+    #[test]
+    fn placeholders_are_filled_in_as_caddy_does() {
+        let env = vec![("SITE_HOST".to_string(), "example.com".to_string())];
+        assert_eq!(
+            with_env("https://{$SITE_HOST} {", &env),
+            "https://example.com {"
+        );
+        assert_eq!(
+            with_env("https://api.{$SITE_HOST:localhost} {", &[]),
+            "https://api.localhost {"
+        );
+        assert_eq!(
+            with_env("https://api.{$SITE_HOST:localhost} {", &env),
+            "https://api.example.com {"
+        );
+        assert_eq!(with_env("https://{$MISSING} {", &[]), "https:// {");
+    }
+
+    #[test]
+    fn a_www_redirect_and_an_unfilled_host_are_not_links() {
+        let caddyfile = "https://localhost {\n}\nhttps://www.localhost {\n}\nhttps://www. {\n}\nhttps://api. {\n}\n";
+        assert_eq!(caddy_hosts(caddyfile), ["localhost"]);
     }
 }

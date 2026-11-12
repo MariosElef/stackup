@@ -8,14 +8,14 @@ use ratatui::{
     layout::{Constraint, Layout, Rect},
     style::{Color, Style},
     text::{Line, Span},
-    widgets::{Block, Paragraph},
+    widgets::Paragraph,
 };
 
 use super::project_about::GRAY;
 use crate::{
     models::{Backend, Facts, Frontend},
     services::projects::logos::{self, Bitmap, Rgb, shrink},
-    ui::theme::pane_border,
+    ui::theme::pane,
 };
 
 /// Height of the art, in rows: the tallest logo.
@@ -315,9 +315,7 @@ fn card(f: &mut Frame, area: Rect, role: &str, facts: &Facts, tick: u64) {
     } else {
         title.push(Span::raw(" "));
     }
-    let block = Block::bordered()
-        .border_style(pane_border(false))
-        .title(Line::from(title));
+    let block = pane(false).title(Line::from(title));
     let columns = usize::from(area.width.saturating_sub(2));
     f.render_widget(
         Paragraph::new(lines(role, facts, columns, tick)).block(block),
@@ -399,6 +397,7 @@ mod tests {
             rust_build: false,
             has_volumes: false,
             migrations: false,
+            databases: false,
         }
     }
 

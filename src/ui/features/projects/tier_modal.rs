@@ -8,22 +8,8 @@ use ratatui::{
 use crate::ui::components::modal;
 use crate::ui::{
     stores::app::TierModal,
-    theme::{CYAN, GREEN, YELLOW, tier_color},
+    theme::{CYAN, GREEN, YELLOW, button, tier_color},
 };
-
-fn button(label: &str, selected: bool) -> Span<'static> {
-    let text = format!(" {label} ");
-    if selected {
-        Span::styled(
-            text,
-            Style::new()
-                .fg(GREEN)
-                .add_modifier(Modifier::BOLD | Modifier::REVERSED),
-        )
-    } else {
-        Span::styled(text, Style::new().add_modifier(Modifier::DIM))
-    }
-}
 
 /// What making an environment did: which passwords are new, what is still the template's and
 /// needs a look, and the choice to switch to it.

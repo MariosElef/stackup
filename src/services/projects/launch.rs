@@ -206,10 +206,13 @@ fn block(part: &Part) -> Vec<String> {
 /// The banner for starting `which` parts of the project in `root`.
 pub fn banner(root: &Path, facts: &Facts, which: Which) -> String {
     let config = docker::config(root).unwrap_or(Value::Null);
-    let caddyfile = std::fs::read_to_string(root.join("Caddyfile")).ok();
+    let env = super::envs::dotenv(root);
+    let caddyfile = std::fs::read_to_string(root.join("Caddyfile"))
+        .ok()
+        .map(|caddyfile| urls::with_env(&caddyfile, &env));
     let mut urls = urls::links(&config, caddyfile.as_deref());
     // The databases' addresses with what to sign in with, ready to paste into a client.
-    urls::add_logins(&mut urls, &super::envs::dotenv(root));
+    urls::add_logins(&mut urls, &env);
     // Every part the project has: the ones this start runs, then the others as not started, so
     // each address is on the screen.
     let mut parts = vec![];
@@ -270,6 +273,7 @@ mod tests {
             rust_build: false,
             has_volumes: false,
             migrations: false,
+            databases: false,
         }
     }
 

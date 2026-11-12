@@ -211,9 +211,15 @@ fn start_runs_the_part_that_was_built_or_both_together() {
     let line = |part| lines(&start(part, &p, &f).unwrap());
     // Each starts with the banner that says where it runs.
     let banner = |part: &str| format!("internal banner {} {part}", p.path.display());
+    // On Linux the proxy container reaches Nuxt through the Docker bridge, so it listens on all.
+    let nuxt = if cfg!(target_os = "linux") {
+        "HOST=0.0.0.0 pnpm dev"
+    } else {
+        "pnpm dev"
+    };
     let front = line(Part::Frontend);
     assert!(front[0].ends_with(&banner("frontend")), "{front:?}");
-    assert_eq!(front[1], "pnpm dev");
+    assert_eq!(front[1], nuxt);
     assert!(line(Part::Backend)[0].ends_with(&banner("backend")));
     assert!(
         line(Part::Backend)
@@ -234,7 +240,7 @@ fn start_runs_the_part_that_was_built_or_both_together() {
     assert!(last.starts_with("sh -c"), "{last}");
     assert!(
         last.contains("(cd backend && cargo watch -x run)")
-            && last.contains("(cd frontend && pnpm dev)")
+            && last.contains(&format!("(cd frontend && {nuxt})"))
     );
     assert!(last.contains("wait"));
 }
@@ -257,8 +263,7 @@ fn dev_runs_the_backend_and_the_frontend_together_when_there_are_both() {
     assert_eq!(steps, lines(&start(Part::Fullstack, &p, &f).unwrap()));
     let last = steps.last().unwrap();
     assert!(
-        last.contains("(cd backend && cargo watch -x run)")
-            && last.contains("(cd frontend && pnpm dev)"),
+        last.contains("(cd backend && cargo watch -x run)") && last.contains("pnpm dev)"),
         "{last}"
     );
 }
@@ -694,4 +699,33 @@ fn migrations_run_with_the_backends_own_tool_against_postgres() {
     let (p, f) = project("nomigrate", &["backend/Cargo.toml"]);
     assert!(!f.migrations);
     assert!(plan(Action::Migrate, &p, &f, &Args::default()).is_err());
+}
+
+#[test]
+fn query_opens_each_databases_own_shell_inside_its_container() {
+    let (p, _) = project("query", &[]);
+    fs::write(
+        p.path.join("docker-compose.yml"),
+        "services:\n  postgres:\n    image: postgres\n  mongo:\n    image: mongo\n  redis:\n    image: redis\n",
+    )
+    .unwrap();
+    let f = Facts::read(&p.path);
+    assert!(f.databases && Action::Query.applies(&f));
+    let shell = |db: &str| {
+        let args = Args {
+            service: Some(db.into()),
+            ..Args::default()
+        };
+        lines(&plan(Action::Query, &p, &f, &args).unwrap())
+    };
+    let psql = shell("postgres");
+    assert_eq!(psql[0], "docker compose up -d --wait postgres");
+    assert!(psql[1].starts_with("docker compose exec postgres sh -c") && psql[1].contains("psql"));
+    assert!(shell("mongo")[1].contains("mongosh"));
+    assert!(shell("redis")[1].contains("redis-cli"));
+    assert!(plan(Action::Query, &p, &f, &Args::default()).is_err());
+
+    // Nothing to query: not offered.
+    let (_, none) = project("noquery", &["backend/Cargo.toml"]);
+    assert!(!none.databases && !Action::Query.applies(&none));
 }

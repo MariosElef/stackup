@@ -125,6 +125,50 @@ fn keys_go_to_a_running_program_and_ctrl_close_bracket_comes_back() {
 }
 
 #[test]
+fn d_leaves_up_running_in_the_background_and_choosing_it_again_shows_it() {
+    let (mut app, _) = app_with("detach", &[("shop", &[])]);
+    press(&mut app, KeyCode::Char('p'));
+    press(&mut app, KeyCode::Enter);
+    let dir = app.project().unwrap().path.clone();
+    // `cat` stands in for `docker compose up`: it runs until it is stopped.
+    let mut run = Run::new(
+        "up · shop",
+        vec![Step::new("start", &dir, "cat", &[])],
+        (24, 80),
+    );
+    run.start_next().unwrap();
+    app.run = Some(run);
+    app.after = Some((Action::Up, crate::models::Args::default()));
+    app.page = Page::Run;
+    assert!(screen(&app).contains("d detach"), "the footer says how");
+
+    press(&mut app, KeyCode::Char('d'));
+    assert_eq!(app.page, Page::Project, "the menu is back");
+    assert!(app.run.is_none() && app.is_detached(Action::Up));
+    for _ in 0..5 {
+        app.pump();
+    }
+    assert!(app.detached[0].run.live(), "it kept running");
+
+    // Typed into the background run, it still answers: the same program, not a new one.
+    app.detached[0].run.type_bytes(b"still here\r");
+    app.action = app.actions.iter().position(|a| *a == Action::Up).unwrap();
+    press(&mut app, KeyCode::Enter);
+    assert_eq!(app.page, Page::Run);
+    assert!(app.detached.is_empty() && app.run.as_ref().unwrap().live());
+    for _ in 0..50 {
+        app.pump();
+        thread::sleep(Duration::from_millis(20));
+    }
+    assert!(screen(&app).contains("still here"), "{}", screen(&app));
+
+    // Other actions have nothing to detach: `d` goes to the program.
+    app.after = Some((Action::Logs, crate::models::Args::default()));
+    press(&mut app, KeyCode::Char('d'));
+    assert_eq!(app.page, Page::Run);
+}
+
+#[test]
 fn add_volume_asks_for_a_name_then_a_service_then_a_path_and_refuses_a_bad_name() {
     let (mut app, root) = app_with("vol", &[("shop", &[])]);
     fs::write(

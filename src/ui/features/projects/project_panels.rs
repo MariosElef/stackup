@@ -4,12 +4,12 @@
 use ratatui::{
     Frame,
     layout::Rect,
-    style::{Modifier, Style},
+    style::Style,
     text::{Line, Span},
     widgets::{Block, Paragraph},
 };
 
-use super::project_about::{GRAY, pill, tech_color};
+use super::project_about::{GRAY, tech_color};
 use crate::{
     services::projects::{
         disk::{self, Usage},
@@ -17,21 +17,16 @@ use crate::{
     },
     ui::{
         stores::app::App,
-        theme::{BLUE, CYAN, GREEN, RED, YELLOW, pane_border},
+        theme::{CYAN, GREEN, RED, RULE, YELLOW, pane, pane_title},
     },
 };
 
 fn panel(title: Line<'static>) -> Block<'static> {
-    Block::bordered()
-        .border_style(pane_border(false))
-        .title(title)
+    pane(false).title(title)
 }
 
 fn plain_title(text: &str) -> Line<'static> {
-    Line::from(Span::styled(
-        format!(" {text} "),
-        Style::new().fg(BLUE).add_modifier(Modifier::BOLD),
-    ))
+    pane_title(text)
 }
 
 /// A line cut to `width` characters, ending in `…` when it was longer.
@@ -45,26 +40,29 @@ fn clip(text: &str, width: usize) -> String {
 
 /// The branch with what is changed, as the title of the commits panel.
 fn git_title(overview: Option<&Overview>) -> Line<'static> {
-    let mut spans = vec![Span::styled(" git ", Style::new().fg(BLUE).bold())];
+    let mut spans = vec![Span::styled(" git ", Style::new().fg(GRAY))];
     if let Some(git) = overview.and_then(|o| o.git.as_ref()) {
-        spans.push(pill(&git.branch, CYAN));
+        spans.push(Span::styled(
+            format!("\u{e0a0} {}", git.branch),
+            Style::new().fg(CYAN).bold(),
+        ));
         if git.dirty > 0 {
             spans.push(Span::styled(
-                format!(" ✱{} changed", git.dirty),
-                Style::new().fg(YELLOW).bold(),
+                format!("  ✱{} changed", git.dirty),
+                Style::new().fg(YELLOW),
             ));
         } else if git.commits {
-            spans.push(Span::styled(" ✓ clean", Style::new().fg(GREEN)));
+            spans.push(Span::styled("  ✓ clean", Style::new().fg(GREEN)));
         }
         if git.ahead > 0 {
             spans.push(Span::styled(
-                format!(" ↑{} to push", git.ahead),
+                format!("  ↑{} to push", git.ahead),
                 Style::new().fg(GREEN),
             ));
         }
         if git.behind > 0 {
             spans.push(Span::styled(
-                format!(" ↓{} to pull", git.behind),
+                format!("  ↓{} to pull", git.behind),
                 Style::new().fg(RED),
             ));
         }
@@ -123,9 +121,7 @@ fn service_line(s: &Service) -> Line<'static> {
         Span::styled(format!(" {dot} "), Style::new().fg(color).bold()),
         Span::styled(
             format!("{:<10}", s.name),
-            Style::new()
-                .fg(tech_color(&s.name))
-                .add_modifier(Modifier::BOLD),
+            Style::new().fg(tech_color(&s.name)),
         ),
         Span::styled(
             format!(
@@ -142,8 +138,11 @@ fn service_line(s: &Service) -> Line<'static> {
 pub fn services(f: &mut Frame, area: Rect, overview: Option<&Overview>) {
     let (up, of) = overview.map_or((0, 0), Overview::up_count);
     let title = Line::from(vec![
-        Span::styled(" services ", Style::new().fg(BLUE).bold()),
-        Span::styled(format!("{up}/{of} up "), Style::new().fg(GRAY)),
+        Span::styled(" services ", Style::new().fg(GRAY)),
+        Span::styled(
+            format!("{up}/{of} up "),
+            Style::new().fg(if up > 0 { GREEN } else { RULE }),
+        ),
     ]);
     let lines: Vec<Line> = match overview {
         Some(o) if o.services.is_empty() => vec![Line::from(Span::styled(
@@ -156,19 +155,15 @@ pub fn services(f: &mut Frame, area: Rect, overview: Option<&Overview>) {
     f.render_widget(Paragraph::new(lines).block(panel(title)), area);
 }
 
-/// A bar `value` long out of `whole`, `width` cells wide.
-fn bar(value: u64, whole: u64, width: usize) -> String {
+/// A thin bar `value` long out of `whole`, `width` cells wide: the filled part, then the track.
+fn bar(value: u64, whole: u64, width: usize) -> (String, String) {
     let filled = if whole == 0 {
         0
     } else {
         ((value as f64 / whole as f64) * width as f64).round() as usize
     };
     let filled = filled.min(width).max(usize::from(value > 0));
-    format!(
-        "{}{}",
-        "█".repeat(filled),
-        "░".repeat(width.saturating_sub(filled))
-    )
+    ("━".repeat(filled), "━".repeat(width.saturating_sub(filled)))
 }
 
 fn usage_line(
@@ -178,10 +173,12 @@ fn usage_line(
     width: usize,
     color: ratatui::style::Color,
 ) -> Line<'static> {
+    let (filled, track) = bar(bytes, whole, width);
     Line::from(vec![
         Span::styled(format!(" {name:<13}"), Style::new().fg(GRAY)),
-        Span::styled(bar(bytes, whole, width), Style::new().fg(color)),
-        Span::styled(format!("  {}", disk::human(bytes)), Style::new().bold()),
+        Span::styled(filled, Style::new().fg(color)),
+        Span::styled(track, Style::new().fg(RULE)),
+        Span::styled(format!("  {}", disk::human(bytes)), Style::new()),
     ])
 }
 
@@ -209,7 +206,7 @@ pub fn room(f: &mut Frame, area: Rect, app: &App, usage: Option<&Usage>) {
     }
     if u.target.is_some_and(|t| t > 0) {
         lines.push(Line::from(Span::styled(
-            " Open the project and choose cargo clean to free the build files.",
+            " cargo clean frees the build files",
             Style::new().fg(GRAY),
         )));
     }
@@ -217,11 +214,11 @@ pub fn room(f: &mut Frame, area: Rect, app: &App, usage: Option<&Usage>) {
 }
 
 fn key(text: &str) -> Span<'static> {
-    pill(text, CYAN)
+    Span::styled(format!(" {text}"), Style::new().fg(CYAN).bold())
 }
 
 fn hint(text: &str) -> Span<'static> {
-    Span::styled(format!(" {text}   "), Style::new().fg(GRAY))
+    Span::styled(format!(" {text}    "), Style::new().fg(GRAY))
 }
 
 /// The keys that work on this page, as keycaps.

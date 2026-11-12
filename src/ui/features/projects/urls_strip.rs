@@ -1,9 +1,9 @@
 use ratatui::{
     Frame,
     layout::{Constraint, Layout, Rect},
-    style::{Modifier, Style},
+    style::Style,
     text::{Line, Span},
-    widgets::{Block, Paragraph},
+    widgets::{Padding, Paragraph},
 };
 
 use super::{
@@ -15,7 +15,7 @@ use crate::{
     services::projects::urls::{Link, Login},
     ui::{
         stores::app::App,
-        theme::{CYAN, GREEN, YELLOW, pane_border},
+        theme::{CYAN, GREEN, YELLOW, pane, pane_title},
     },
 };
 
@@ -48,8 +48,8 @@ impl Panel {
             Panel::Links(_, links, _, logins) => {
                 links.len()
                     + signed_in(links, logins)
-                        .map(|g| g.lines.len())
-                        .sum::<usize>()
+                        .filter(|g| !fields(g).is_empty())
+                        .count()
             }
             Panel::Logos(_) => usize::from(stack_banner::SMALL_HEIGHT),
         }
@@ -65,7 +65,7 @@ impl Panel {
                     .map(|l| login_width(l) + label + 6)
                     .max()
                     .unwrap_or(0);
-                (label + address + 14).max(login) as u16
+                (label + address + 10).max(login) as u16
             }
             Panel::Logos(facts) => stack_banner::small_width(facts) + 2,
         }
@@ -101,11 +101,12 @@ fn panels(app: &App, width: u16) -> Vec<Panel> {
     out
 }
 
-/// How tall the row of panels is: the tallest one and its borders when they sit side by side, all
-/// of them one under the other when it is too narrow. Nothing when there are no addresses.
+/// How tall the row of panels is: the tallest one, its borders and the blank line above it when
+/// they sit side by side, all of them one under the other when it is too narrow. Nothing when
+/// there are no addresses.
 pub fn height(app: &App, width: u16) -> u16 {
     let panels = panels(app, width);
-    let rows = |p: &Panel| p.rows() as u16 + 2;
+    let rows = |p: &Panel| p.rows() as u16 + 3;
     if width >= SIDE_BY_SIDE {
         panels.iter().map(rows).max().unwrap_or(0).min(14)
     } else {
@@ -120,70 +121,87 @@ fn signed_in<'a>(links: &'a [Link], logins: &'a [Login]) -> impl Iterator<Item =
         .filter(|g| links.iter().any(|l| l.label == g.label))
 }
 
-/// The widest of a sign-in's lines.
-fn login_width(login: &Login) -> usize {
+/// What a sign-in adds to its address: host and port are already in it, so only the rest.
+fn fields(login: &Login) -> Vec<&(&'static str, String)> {
     login
         .lines
         .iter()
-        .map(|line| line.iter().map(|(k, v)| k.len() + v.len() + 3).sum())
-        .max()
-        .unwrap_or(0)
-}
-
-/// A sign-in under its address, lined up with the address: `host localhost  port 5432`, then
-/// `user app  password change-me  database app`.
-fn login_lines(login: &Login, indent: usize) -> Vec<Line<'static>> {
-    login
-        .lines
-        .iter()
-        .map(|fields| {
-            let mut spans = vec![Span::raw(" ".repeat(indent))];
-            for (key, value) in fields {
-                if value.is_empty() {
-                    spans.push(Span::styled(format!("{key}  "), Style::new().fg(GRAY)));
-                } else {
-                    spans.push(Span::styled(format!("{key} "), Style::new().fg(GRAY)));
-                    spans.push(Span::styled(format!("{value}  "), Style::new().fg(YELLOW)));
-                }
-            }
-            Line::from(spans)
-        })
+        .flatten()
+        .filter(|(key, _)| !matches!(*key, "host" | "port"))
         .collect()
 }
 
-/// A line per address: a dot for whether something answers, what it is, where, and the word;
-/// under one that asks for a sign-in, what to sign in with.
+/// How wide a sign-in's line is.
+fn login_width(login: &Login) -> usize {
+    fields(login)
+        .iter()
+        .map(|(k, v)| k.len() + v.len() + 3)
+        .sum()
+}
+
+/// A sign-in under its address, lined up with it: `user app  password change-me  database app`,
+/// or a note such as `no password`.
+fn login_line(login: &Login, indent: usize) -> Option<Line<'static>> {
+    let fields = fields(login);
+    if fields.is_empty() {
+        return None;
+    }
+    let mut spans = vec![Span::raw(" ".repeat(indent))];
+    for (key, value) in fields {
+        if value.is_empty() {
+            spans.push(Span::styled(
+                format!("{key}  "),
+                Style::new().fg(GRAY).italic(),
+            ));
+        } else {
+            spans.push(Span::styled(format!("{key} "), Style::new().fg(GRAY)));
+            spans.push(Span::styled(format!("{value}  "), Style::new().fg(YELLOW)));
+        }
+    }
+    Some(Line::from(spans))
+}
+
+/// An address with its scheme quieted, so the eye lands on where it points.
+fn address(url: &str, color: Style) -> Vec<Span<'static>> {
+    match url.split_once("://") {
+        Some((scheme, rest)) => vec![
+            Span::styled(format!("{scheme}://"), Style::new().fg(GRAY)),
+            Span::styled(rest.to_string(), color),
+        ],
+        None => vec![Span::styled(url.to_string(), color)],
+    }
+}
+
+/// A line per address: a dot for whether something answers (filled and green when it does),
+/// what it is and where; under one that asks for a sign-in, what to sign in with.
 fn rows(links: &[Link], web: bool, logins: &[Login]) -> Vec<Line<'static>> {
     let label = links.iter().map(|l| l.label.len()).max().unwrap_or(0);
-    let address = links.iter().map(|l| l.url.len()).max().unwrap_or(0);
     links
         .iter()
         .flat_map(|l| {
-            let (dot, word, color) = match l.up {
-                Some(true) => ("●", "up", GREEN),
-                Some(false) => ("○", "down", GRAY),
-                None => (" ", "", GRAY),
+            let dot = match l.up {
+                Some(true) => Span::styled("● ", Style::new().fg(GREEN)),
+                Some(false) => Span::styled("○ ", Style::new().fg(GRAY)),
+                None => Span::raw("  "),
             };
             let url = if web {
-                Style::new().fg(CYAN).add_modifier(Modifier::UNDERLINED)
+                Style::new().fg(CYAN)
             } else {
                 Style::new()
             };
-            let line = Line::from(vec![
-                Span::styled(format!("  {dot} "), Style::new().fg(color)),
+            let mut spans = vec![
+                dot,
                 Span::styled(
-                    format!("{:<label$}  ", l.label),
-                    Style::new().fg(tech_color(&l.label)).bold(),
+                    format!("{:<label$}   ", l.label),
+                    Style::new().fg(tech_color(&l.label)),
                 ),
-                Span::styled(format!("{:<address$}", l.url), url),
-                Span::styled(format!("  {word}"), Style::new().fg(color)),
-            ]);
+            ];
+            spans.extend(address(&l.url, url));
             let login = logins
                 .iter()
                 .find(|g| g.label == l.label)
-                .map(|g| login_lines(g, label + 6))
-                .unwrap_or_default();
-            std::iter::once(line).chain(login)
+                .and_then(|g| login_line(g, label + 5));
+            std::iter::once(Line::from(spans)).chain(login)
         })
         .collect()
 }
@@ -194,12 +212,9 @@ fn draw(f: &mut Frame, area: Rect, panel: &Panel, tick: u64) {
         Panel::Links(title, ..) => *title,
         Panel::Logos(_) => "built with",
     };
-    let block = Block::bordered()
-        .border_style(pane_border(false))
-        .title(Line::from(Span::styled(
-            format!(" {title} "),
-            Style::new().fg(GRAY),
-        )));
+    let block = pane(false)
+        .title(pane_title(title))
+        .padding(Padding::new(1, 1, 1, 0));
     let inner = block.inner(area);
     f.render_widget(block, area);
     match panel {
@@ -236,7 +251,7 @@ pub fn render(f: &mut Frame, area: Rect, app: &App) {
     } else {
         let heights: Vec<Constraint> = panels
             .iter()
-            .map(|p| Constraint::Length(p.rows() as u16 + 2))
+            .map(|p| Constraint::Length(p.rows() as u16 + 3))
             .collect();
         for (p, a) in panels
             .iter()
@@ -271,8 +286,8 @@ mod tests {
         };
         // No project open, so no logos. Side by side: the taller list and the borders; too narrow
         // for that: each panel under the other.
-        assert_eq!(height(&app, 120), 2 + 2);
-        assert_eq!(height(&app, 50), (2 + 2) + (1 + 2));
+        assert_eq!(height(&app, 120), 2 + 3);
+        assert_eq!(height(&app, 50), (2 + 3) + (1 + 3));
     }
 
     #[test]
@@ -293,11 +308,12 @@ mod tests {
             .iter()
             .map(|l| l.spans.iter().map(|s| s.content.as_ref()).collect())
             .collect();
-        assert_eq!(text.len(), 4, "{text:?}");
+        // Host and port are in the address already: only the rest goes under it.
+        assert_eq!(text.len(), 3, "{text:?}");
         assert!(text[0].contains("postgres"));
-        assert!(text[1].contains("host localhost") && text[1].contains("port 5432"));
-        assert!(text[2].contains("user app") && text[2].contains("password s3cret"));
-        assert!(text[3].contains("redis"));
+        assert!(text[1].contains("user app") && text[1].contains("password s3cret"));
+        assert!(!text[1].contains("host"));
+        assert!(text[2].contains("redis"));
     }
 
     #[test]
@@ -313,7 +329,7 @@ mod tests {
             true,
             &[],
         );
-        assert!(text(&lines[0]).contains('●') && text(&lines[0]).ends_with("up"));
-        assert!(text(&lines[1]).contains('○') && text(&lines[1]).ends_with("down"));
+        assert!(text(&lines[0]).starts_with('●'));
+        assert!(text(&lines[1]).starts_with('○'));
     }
 }

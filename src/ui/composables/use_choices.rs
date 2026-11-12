@@ -163,6 +163,7 @@ impl App {
             Question::VolumeService => args.service = Some(picked.to_string()),
             Question::Volume => args.volume = Some(picked.to_string()),
             Question::Backup => args.backup = Some(picked.to_string()),
+            Question::Database => args.service = Some(picked.to_string()),
             _ => {}
         }
         self.ask_next(action, args, left);
@@ -225,6 +226,35 @@ impl App {
             })
             .collect();
         self.open_param_picker(Question::VolumeService, options, (action, args, left));
+    }
+
+    /// Which database to query: asked only when there is more than one.
+    pub(crate) fn open_database_picker(
+        &mut self,
+        action: Action,
+        mut args: Args,
+        left: Vec<Param>,
+    ) {
+        let text = self.compose_text().unwrap_or_default();
+        let found = volumes::databases(&text);
+        if let [only] = found.as_slice() {
+            args.service = Some(only.clone());
+            return self.ask_next(action, args, left);
+        }
+        let options = found
+            .into_iter()
+            .map(|db| Choice {
+                note: match db.as_str() {
+                    "postgres" => "SQL, with psql",
+                    "mongo" => "documents, with mongosh",
+                    _ => "keys, with redis-cli",
+                }
+                .into(),
+                label: db.clone(),
+                value: db,
+            })
+            .collect();
+        self.open_param_picker(Question::Database, options, (action, args, left));
     }
 
     /// Which of the declared volumes, with where each is used.

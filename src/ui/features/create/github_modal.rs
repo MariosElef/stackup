@@ -1,30 +1,15 @@
 use ratatui::{
     Frame,
     layout::Rect,
-    style::{Modifier, Style},
+    style::Style,
     text::{Line, Span},
 };
 
 use crate::ui::{
     components::modal,
     stores::app::GithubModal,
-    theme::{CYAN, GREEN, RED, YELLOW},
+    theme::{CYAN, GREEN, RED, YELLOW, button},
 };
-
-fn button(label: &str, selected: bool) -> Span<'static> {
-    let text = format!(" {label} ");
-    if selected {
-        Span::styled(
-            text,
-            Style::new()
-                .fg(GREEN)
-                .bold()
-                .add_modifier(Modifier::REVERSED),
-        )
-    } else {
-        Span::styled(text, Style::new().dim())
-    }
-}
 
 fn mark(done: bool, what: &str) -> Line<'static> {
     let (sign, color) = if done { ("✓", GREEN) } else { ("✗", RED) };

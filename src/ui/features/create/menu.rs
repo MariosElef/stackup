@@ -3,12 +3,12 @@ use ratatui::{
     layout::Rect,
     style::{Modifier, Style, Stylize},
     text::{Line, Span},
-    widgets::{Block, List, ListItem, ListState},
+    widgets::{List, ListItem, ListState, Padding},
 };
 
 use crate::ui::{
     features::create::wizard::Wizard,
-    theme::{CYAN, GREEN, pane_border},
+    theme::{CYAN, GRAY, GREEN, pane, pane_title, selected},
     types::{Focus, Row},
 };
 
@@ -21,12 +21,12 @@ pub fn render(f: &mut Frame, area: Rect, w: &Wizard) {
         .collect();
     let list = List::new(items)
         .block(
-            Block::bordered()
-                .border_style(pane_border(focused))
-                .title(format!(" stackup · {} ", w.name)),
+            pane(focused)
+                .title(pane_title(&format!("stackup · {}", w.name)))
+                .padding(Padding::new(1, 1, 1, 0)),
         )
         .highlight_style(if focused {
-            Style::new().add_modifier(Modifier::REVERSED)
+            selected()
         } else {
             Style::new().add_modifier(Modifier::BOLD)
         });
@@ -37,22 +37,22 @@ pub fn render(f: &mut Frame, area: Rect, w: &Wizard) {
 fn row_line(w: &Wizard, row: &Row) -> Line<'static> {
     let radio = |on: bool, label: String| {
         let (mark, style) = if on {
-            ("(•) ", Style::new().fg(GREEN).bold())
+            (" \u{f192}  ", Style::new().fg(CYAN))
         } else {
-            ("( ) ", Style::new())
+            (" \u{f10c}  ", Style::new().fg(GRAY))
         };
         Line::from(vec![Span::styled(mark, style), Span::raw(label)])
     };
     let check = |on: bool, label: String| {
         let (mark, style) = if on {
-            ("[x] ", Style::new().fg(GREEN).bold())
+            (" \u{f14a}  ", Style::new().fg(CYAN))
         } else {
-            ("[ ] ", Style::new())
+            (" \u{f096}  ", Style::new().fg(GRAY))
         };
         Line::from(vec![Span::styled(mark, style), Span::raw(label)])
     };
     match *row {
-        Row::Header(t) => Line::from(Span::styled(t, Style::new().fg(CYAN).bold())),
+        Row::Header(t) => Line::from(Span::styled(t, Style::new().fg(CYAN).dim().bold())),
         Row::Gap => Line::raw(""),
         Row::Frontend(f) => radio(w.sel.frontend == f, f.to_string()),
         Row::Backend(b) => radio(w.sel.backend == b, b.to_string()),
@@ -76,7 +76,7 @@ fn row_line(w: &Wizard, row: &Row) -> Line<'static> {
         }
         Row::Tool(t) => check(w.sel.tools.contains(&t), t.to_string()),
         Row::Create => Line::from(Span::styled(
-            "▶ Create project",
+            " \u{f135}  Create project",
             Style::new().fg(GREEN).bold(),
         )),
     }

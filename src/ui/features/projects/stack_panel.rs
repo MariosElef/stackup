@@ -5,21 +5,25 @@ use ratatui::{
     layout::Rect,
     style::Style,
     text::{Line, Span},
-    widgets::{Block, Paragraph, Wrap},
+    widgets::{Padding, Paragraph, Wrap},
 };
 
-use super::project_about::{GRAY, pill, row, tech_color};
+use super::project_about::{row, tech_color};
 use crate::{
     services::projects::stack::Stack,
-    ui::{stores::app::App, theme::pane_border},
+    ui::{
+        stores::app::App,
+        theme::{GRAY, RULE, pane, pane_title},
+    },
 };
 
-/// The rows: each layer that has something, the first name as a badge and the rest after it.
+/// The rows: each layer that has something. Its main piece (the framework) is in its color, and
+/// every service in its own; the rest are plain, with a quiet dot between them.
 pub fn lines(stack: &Stack) -> Vec<Line<'static>> {
     [
         ("frontend", &stack.frontend),
         ("backend", &stack.backend),
-        ("ORM/drivers", &stack.data),
+        ("data", &stack.data),
         ("services", &stack.services),
         ("tools", &stack.tools),
     ]
@@ -29,13 +33,15 @@ pub fn lines(stack: &Stack) -> Vec<Line<'static>> {
         let mut spans = vec![];
         for (i, name) in names.iter().enumerate() {
             if i > 0 {
-                spans.push(Span::styled(" · ", Style::new().fg(GRAY)));
+                spans.push(Span::styled("  ·  ", Style::new().fg(RULE)));
             }
-            // A layer's main piece (the framework) stands out; services each get their color.
             if i == 0 && layer != "tools" || layer == "services" {
-                spans.push(pill(name, tech_color(name)));
+                spans.push(Span::styled(
+                    name.clone(),
+                    Style::new().fg(tech_color(name)).bold(),
+                ));
             } else {
-                spans.push(Span::raw(name.clone()));
+                spans.push(Span::styled(name.clone(), Style::new().fg(GRAY)));
             }
         }
         row(layer, spans)
@@ -50,9 +56,9 @@ pub fn height(app: &App) -> u16 {
 }
 
 pub fn render(f: &mut Frame, area: Rect, app: &App) {
-    let block = Block::bordered()
-        .border_style(pane_border(false))
-        .title(Line::from(Span::styled(" stack ", Style::new().fg(GRAY))));
+    let block = pane(false)
+        .title(pane_title("stack"))
+        .padding(Padding::horizontal(1));
     f.render_widget(
         Paragraph::new(lines(&app.stack))
             .wrap(Wrap { trim: false })

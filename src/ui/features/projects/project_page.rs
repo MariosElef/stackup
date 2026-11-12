@@ -19,7 +19,7 @@ pub fn render(f: &mut Frame, area: Rect, app: &App) {
         return output::render(f, area, app);
     }
     let [left, right] =
-        Layout::horizontal([Constraint::Length(24), Constraint::Min(40)]).areas(area);
+        Layout::horizontal([Constraint::Length(30), Constraint::Min(40)]).areas(area);
     action_list::render(f, left, app);
     // Under what the right side shows, where the project can be reached.
     let strip = urls_strip::height(app, right.width);

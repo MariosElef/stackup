@@ -8,7 +8,7 @@ use ratatui::{
     layout::Rect,
     style::{Color, Style},
     text::{Line, Span},
-    widgets::{Block, Paragraph},
+    widgets::Paragraph,
 };
 
 use super::{project_about::GRAY, stack_banner::letter};
@@ -161,7 +161,7 @@ fn frame(px: &[Vec<Option<Tone>>], t: f32, width: usize, height: usize) -> Vec<V
 
 /// The panel: the crumbling name, and under it what went.
 pub fn render(f: &mut Frame, area: Rect, farewell: &Farewell) {
-    let block = Block::bordered()
+    let block = crate::ui::theme::pane(false)
         .border_style(Style::new().fg(RED))
         .title(Line::from(Span::styled(
             " removed ",
@@ -260,6 +260,7 @@ mod tests {
             rust_build: false,
             has_volumes: false,
             migrations: false,
+            databases: false,
         };
         let bare = Farewell::new("shop", "x", None).sprite();
         let dressed = Farewell::new("shop", "x", Some(&facts)).sprite();

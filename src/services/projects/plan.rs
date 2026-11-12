@@ -56,6 +56,7 @@ pub fn plan(action: Action, p: &Project, facts: &Facts, args: &Args) -> Result<V
         Action::Migrate => migrations::migrate(root, facts)?,
         Action::MigrationNew => migrations::new(root, facts, args)?,
         Action::MigrationRevert => migrations::revert(root, facts)?,
+        Action::Query => migrations::query(root, args)?,
         Action::Ci => vec![Step::new("run the CI checks", root, "sh", &["ci.sh"])],
         Action::Fmt => ship::fmt(root, facts)?,
         Action::CargoClean => ship::cargo_clean(p)?,

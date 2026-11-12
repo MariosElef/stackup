@@ -192,13 +192,19 @@ impl App {
         }
     }
 
-    /// While something runs, every key goes to it, except Ctrl-] which comes back to the menu.
+    /// While something runs, every key goes to it, except Ctrl-] which comes back to the menu,
+    /// and `d` in `up` or `dev`, which leaves it running in the background.
     fn run_key(&mut self, key: KeyEvent) {
         let ctrl = key.modifiers.contains(KeyModifiers::CONTROL);
         let live = self.run.as_ref().is_some_and(|r| r.live());
         if live {
             if ctrl && key.code == KeyCode::Char(']') {
                 self.back();
+            } else if key.code == KeyCode::Char('d')
+                && key.modifiers.is_empty()
+                && self.detachable()
+            {
+                self.detach();
             } else if let Some(run) = &mut self.run {
                 run.type_bytes(&key_bytes(key));
             }

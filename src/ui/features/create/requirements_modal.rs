@@ -1,7 +1,7 @@
 use ratatui::{
     Frame,
     layout::Rect,
-    style::{Modifier, Style},
+    style::Style,
     text::{Line, Span},
 };
 
@@ -11,24 +11,9 @@ use crate::{
     ui::{
         features::create::use_requirements::needed_for,
         stores::app::InstallModal,
-        theme::{CYAN, GREEN, RED, YELLOW},
+        theme::{CYAN, RED, YELLOW, button},
     },
 };
-
-fn button(label: &str, selected: bool) -> Span<'static> {
-    let text = format!(" {label} ");
-    if selected {
-        Span::styled(
-            text,
-            Style::new()
-                .fg(GREEN)
-                .bold()
-                .add_modifier(Modifier::REVERSED),
-        )
-    } else {
-        Span::styled(text, Style::new().dim())
-    }
-}
 
 /// Asked when Create is pressed and something the stack needs is missing: what, what it is for,
 /// and what would be run to install it. Install or Close, so nothing is installed by surprise.

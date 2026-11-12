@@ -15,7 +15,8 @@ pub fn render(f: &mut Frame, area: Rect, app: &App) {
     let [col] = Layout::horizontal([Constraint::Max(96)])
         .flex(Flex::Center)
         .areas(area);
-    let list_height = HOME_ITEMS as u16 + 2;
+    // The rows, the borders, and a blank line of padding above and below.
+    let list_height = HOME_ITEMS as u16 + 4;
     let with_logo = col.width >= logo::WIDTH && area.height >= logo::HEIGHT + 2 + list_height;
     if !with_logo {
         let [list] = Layout::vertical([Constraint::Length(list_height)])

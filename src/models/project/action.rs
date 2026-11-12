@@ -17,6 +17,8 @@ pub enum Action {
     MigrationNew,
     /// Undo the last migration.
     MigrationRevert,
+    /// A database's own shell, inside the menu: psql, mongosh or redis-cli.
+    Query,
     Build,
     Deploy,
     Ci,
@@ -89,6 +91,8 @@ pub enum Param {
     BackupFile,
     /// What a new migration is about, which names its files: typed.
     MigrationName,
+    /// Which database to query: picked, or the only one there is.
+    Database,
 }
 
 impl Action {
@@ -100,6 +104,7 @@ impl Action {
         Action::Migrate,
         Action::MigrationNew,
         Action::MigrationRevert,
+        Action::Query,
         Action::Ps,
         Action::Stop,
         Action::Images,
@@ -135,6 +140,7 @@ impl Action {
             Action::Logs => "logs",
             Action::Dev => "dev",
             Action::Migrate => "migrate",
+            Action::Query => "query",
             Action::MigrationNew => "new-migration",
             Action::MigrationRevert => "revert-migration",
             Action::Build => "build",
@@ -176,7 +182,9 @@ impl Action {
     pub fn group(self) -> Group {
         match self {
             Action::Up | Action::Down | Action::Logs | Action::Dev => Group::Run,
-            Action::Migrate | Action::MigrationNew | Action::MigrationRevert => Group::Database,
+            Action::Migrate | Action::MigrationNew | Action::MigrationRevert | Action::Query => {
+                Group::Database
+            }
             Action::Ps
             | Action::Stop
             | Action::Images
@@ -205,6 +213,7 @@ impl Action {
             Action::Logs => "Follow the logs of every service",
             Action::Dev => "Databases in Docker, the backend and the frontend with reload",
             Action::Migrate => "Apply the migrations not applied yet",
+            Action::Query => "Run queries on a database, in this window",
             Action::MigrationNew => "Make the next migration",
             Action::MigrationRevert => "Undo the last migration",
             Action::Build => "Build the Docker images",
@@ -250,6 +259,9 @@ impl Action {
             }
             Action::Migrate => {
                 "Starts Postgres in Docker, then applies what is new in backend/migrations: sqlx migrate run (axum) or alembic upgrade head (FastAPI). The backend also does this each time it starts, in dev and in Docker."
+            }
+            Action::Query => {
+                "Starts the database in Docker if it is not running, then opens its own shell inside the container, signed in: psql for Postgres (SQL, \\dt lists the tables), mongosh for MongoDB, redis-cli for Redis. Asks which when the project has more than one. Quit the shell (\\q, exit, or Ctrl-D) and you are back here."
             }
             Action::MigrationNew => {
                 "Asks what it is about (add_users), then writes its files in backend/migrations: an up and a down .sql (sqlx migrate add -r --sequential), or a revision with upgrade and downgrade (alembic revision). Fill them in; the next start applies it."
@@ -313,6 +325,7 @@ impl Action {
             && match self {
                 Action::Dev => f.backend != Backend::None || f.frontend != Frontend::None,
                 Action::Migrate | Action::MigrationNew | Action::MigrationRevert => f.migrations,
+                Action::Query => f.databases,
                 Action::Ci => f.ci,
                 Action::Certs => f.https,
                 Action::Hooks => f.hooks,
@@ -329,6 +342,7 @@ impl Action {
         match self {
             Action::Deploy => &[Param::Host],
             Action::MigrationNew => &[Param::MigrationName],
+            Action::Query => &[Param::Database],
             Action::Env => &[Param::Tier],
             Action::GitRepo => &[Param::Visibility],
             Action::Remove => &[Param::RemoveFrom],

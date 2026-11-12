@@ -1,30 +1,15 @@
 use ratatui::{
     Frame,
     layout::Rect,
-    style::{Modifier, Style},
+    style::Style,
     text::{Line, Span},
 };
 
 use super::modal;
 use crate::ui::{
     stores::app::AutofixModal,
-    theme::{CYAN, GREEN, RED, YELLOW},
+    theme::{CYAN, RED, YELLOW, button},
 };
-
-fn button(label: &str, selected: bool) -> Span<'static> {
-    let text = format!(" {label} ");
-    if selected {
-        Span::styled(
-            text,
-            Style::new()
-                .fg(GREEN)
-                .bold()
-                .add_modifier(Modifier::REVERSED),
-        )
-    } else {
-        Span::styled(text, Style::new().dim())
-    }
-}
 
 /// Offered when a run fails with an error stackup recognises: what went wrong, the exact commands
 /// that would fix it, and that the failed steps are then run again. Autofix or Close.

@@ -3,13 +3,12 @@ use ratatui::{
     layout::Rect,
     style::Style,
     text::{Line, Span},
-    widgets::Block,
 };
 use tui_term::widget::PseudoTerminal;
 
 use crate::ui::{
     stores::{app::App, run::Run},
-    theme::{GREEN, RED, YELLOW, pane_border},
+    theme::{GREEN, RED, YELLOW, pane},
 };
 
 fn title(run: &Run) -> Line<'static> {
@@ -36,8 +35,6 @@ pub fn render(f: &mut Frame, area: Rect, app: &App) {
     let Some(run) = &app.run else { return };
     app.pane
         .set((area.height.saturating_sub(2), area.width.saturating_sub(2)));
-    let block = Block::bordered()
-        .border_style(pane_border(true))
-        .title(title(run));
+    let block = pane(true).title(title(run));
     f.render_widget(PseudoTerminal::new(run.term.screen()).block(block), area);
 }

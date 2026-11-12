@@ -10,7 +10,7 @@ use crate::{
     services::toolchain::versions::Question,
     ui::{
         stores::app::ChoiceModal,
-        theme::{CYAN, GREEN, YELLOW, tier_color},
+        theme::{self, CYAN, GREEN, SELECTED_BG, YELLOW, tier_color},
     },
 };
 
@@ -34,13 +34,10 @@ pub fn render(f: &mut Frame, screen: Rect, state: &ChoiceModal) {
     ];
     for (i, option) in state.options.iter().enumerate() {
         let selected = i == state.selected;
-        let marker = if selected { "(•)" } else { "( )" };
-        let head = format!(" {marker} {}  {}", i + 1, option.label);
+        let marker = if selected { "\u{f192}" } else { "\u{f10c}" };
+        let head = format!(" {marker}  {}  {} ", i + 1, option.label);
         let head_style = if selected {
-            Style::new()
-                .fg(GREEN)
-                .bold()
-                .add_modifier(Modifier::REVERSED)
+            theme::selected().fg(CYAN)
         } else if is_tier && option.value != "+new" {
             // An environment shows in its own color, so prod reads as prod.
             Style::new().fg(tier_color(&option.value))
@@ -76,6 +73,7 @@ pub fn render(f: &mut Frame, screen: Rect, state: &ChoiceModal) {
             Question::VolumeService => "service",
             Question::Volume => "volume",
             Question::Backup => "backup",
+            Question::Database => "query",
             _ => "choose a version",
         },
         lines,
@@ -130,17 +128,17 @@ fn render_environments(f: &mut Frame, screen: Rect, state: &ChoiceModal) {
     let last = state.options.len().saturating_sub(1);
     for (i, option) in state.options.iter().enumerate() {
         let selected = i == state.selected;
-        let cursor = if selected { "▶" } else { " " };
-        let row = Style::new().add_modifier(if selected {
-            Modifier::REVERSED
+        let cursor = if selected { "▌" } else { " " };
+        let row = if selected {
+            Style::new().bg(SELECTED_BG)
         } else {
-            Modifier::empty()
-        });
+            Style::new()
+        };
         if option.value == "+new" && i == last {
             lines.push(Line::from(""));
             lines.push(Line::from(vec![
-                Span::raw(format!(" {cursor} ")),
-                Span::styled(format!("+ {}", option.label), row.fg(GREEN)),
+                Span::styled(format!(" {cursor} "), Style::new().fg(CYAN)),
+                Span::styled(format!(" + {} ", option.label), row.fg(GREEN)),
                 Span::styled(format!("  {}", option.note), dim),
             ]));
             continue;
@@ -148,8 +146,8 @@ fn render_environments(f: &mut Frame, screen: Rect, state: &ChoiceModal) {
         let is_active = active == Some(option.value.as_str());
         let color = tier_color(&option.value);
         lines.push(Line::from(vec![
-            Span::raw(format!(" {cursor} ")),
-            Span::styled(if is_active { "● " } else { "○ " }, Style::new().fg(color)),
+            Span::styled(format!(" {cursor} "), Style::new().fg(CYAN)),
+            Span::styled(if is_active { " ● " } else { " ○ " }, row.fg(color)),
             Span::styled(
                 format!("{:<10}", option.label),
                 row.fg(color).add_modifier(Modifier::BOLD),

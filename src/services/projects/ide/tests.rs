@@ -22,6 +22,7 @@ fn facts(frontend: Frontend, backend: Backend) -> Facts {
         rust_build: false,
         has_volumes: false,
         migrations: false,
+        databases: false,
     }
 }
 
@@ -141,7 +142,7 @@ fn only_the_parts_that_exist_get_a_configuration_in_both_ides() {
     assert_eq!(entry["type"], "node-terminal");
     assert_eq!(
         entry["command"],
-        "\"/x/stackup\" start frontend --path \"${workspaceFolder}\""
+        vscode_launch(Part::Frontend, "/x/stackup", cfg!(windows))["command"]
     );
 }
 

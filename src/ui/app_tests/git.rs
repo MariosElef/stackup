@@ -52,7 +52,7 @@ fn lazygit_runs_inside_the_app_on_the_whole_page_and_quitting_it_comes_back() {
     assert_eq!(app.page, Page::Run, "it runs in the app's own terminal");
     let shown = screen(&app);
     assert!(
-        !shown.contains("▶"),
+        !shown.contains("Build & ship ─"),
         "the action list is out of the way: lazygit has the whole page\n{shown}"
     );
 
@@ -85,7 +85,7 @@ fn lazygit_is_in_the_list_under_git_and_the_groups_are_not_split() {
         .unwrap();
     let shown = screen(&app);
     assert!(
-        shown.contains("Git") && shown.contains("lazygit"),
+        shown.contains("Git ─") && shown.contains("lazygit"),
         "{shown}"
     );
     // Each section header appears once.
@@ -97,7 +97,7 @@ fn lazygit_is_in_the_list_under_git_and_the_groups_are_not_split() {
         "Git",
         "Project",
     ] {
-        let count = shown.matches(&format!("│{header}")).count();
+        let count = shown.matches(&format!("{header} ─")).count();
         assert!(count <= 1, "{header} appears {count} times\n{shown}");
     }
 }

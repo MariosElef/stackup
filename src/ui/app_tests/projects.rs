@@ -433,14 +433,14 @@ fn the_project_panel_shows_what_is_running_the_stack_and_where_git_is() {
         "axum",
         "postgres",
         "redis",
-        "STACK",
+        "Stack",
         "git",
         "services 1/2 up",
         "room it takes",
         "keys",
         "main",
         "first commit",
-        "ENVIRONMENT",
+        "Environment",
     ] {
         assert!(shown.contains(text), "{text} missing:\n{shown}");
     }

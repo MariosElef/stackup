@@ -32,6 +32,28 @@ fn postgres(root: &Path) -> Step {
     compose_step("start Postgres", root, &["up", "-d", "--wait", "postgres"])
 }
 
+/// A database's shell in its container, signed in with what the container itself was started
+/// with, so `.env` and the compose defaults agree without stackup reading either.
+pub(super) fn query(root: &Path, args: &Args) -> Result<Vec<Step>> {
+    let Some(db) = args.service.as_deref() else {
+        bail!("which database? postgres, mongo or redis");
+    };
+    let shell = match db {
+        "postgres" => r#"psql -U "$POSTGRES_USER" -d "$POSTGRES_DB""#,
+        "mongo" => "mongosh --quiet",
+        "redis" => "redis-cli",
+        other => bail!("`{other}` is not a database stackup can query"),
+    };
+    Ok(vec![
+        compose_step(&format!("start {db}"), root, &["up", "-d", "--wait", db]),
+        compose_step(
+            &format!("open {}", shell.split(' ').next().unwrap_or(shell)),
+            root,
+            &["exec", db, "sh", "-c", shell],
+        ),
+    ])
+}
+
 /// The steps that bring the database up to date.
 pub(super) fn apply(root: &Path, facts: &Facts) -> Result<Step> {
     tool(

@@ -154,6 +154,9 @@ impl App {
                 Page::Project => {
                     " j/k move · <CR> run · e env · o open · r remove · : commands · h back · ? keymaps"
                 }
+                Page::Run if self.detachable() => {
+                    " d detach (keeps running) · Ctrl-] back to the menu (stops it) · every other key goes to the program"
+                }
                 Page::Run | Page::Install if self.run.as_ref().is_some_and(|r| r.live()) => {
                     " Ctrl-] back to the menu (stops it) · every other key goes to the program"
                 }
